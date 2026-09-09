@@ -27,18 +27,25 @@ int ramp(int cur, int tgt, int step){
 }
 
 // Driver BTN: 2 pin arah (D1/D2) + 1 pin PWM kecepatan.
+// Cache arah terakhir per kanal -> skip digitalWrite kalau arah tidak berubah
+// (digitalWrite GPIO cukup mahal, dipanggil tiap 2ms jadi penghematan nyata)
+static int8_t lastDir[2] = {0, 0};  // indeks = kanal (M1_CH / M2_CH)
+
 void setMotor(uint8_t d1, uint8_t d2, uint8_t ch, int spd){
   spd = constrain(spd, -255, 255);
-  if (spd > 0){
-    digitalWrite(d1, HIGH); digitalWrite(d2, LOW);
-    ledcWrite(ch, spd);
-  } else if (spd < 0){
-    digitalWrite(d1, LOW);  digitalWrite(d2, HIGH);
-    ledcWrite(ch, -spd);
-  } else {
-    digitalWrite(d1, LOW);  digitalWrite(d2, LOW);
-    ledcWrite(ch, 0);
+  int8_t dir = (spd > 0) ? 1 : (spd < 0) ? -1 : 0;
+
+  if (dir != lastDir[ch]) {   // arah berubah -> update pin arah
+    lastDir[ch] = dir;
+    if (dir > 0){
+      digitalWrite(d1, HIGH); digitalWrite(d2, LOW);
+    } else if (dir < 0){
+      digitalWrite(d1, LOW);  digitalWrite(d2, HIGH);
+    } else {
+      digitalWrite(d1, LOW);  digitalWrite(d2, LOW);
+    }
   }
+  ledcWrite(ch, (dir == 0) ? 0 : abs(spd));
 }
 
 void setMotorL(int spd){ setMotor(M1_D1, M1_D2, M1_CH, spd); }  // Motor 1

@@ -1,5 +1,6 @@
 // ============================================================
 //  main.cpp  —  TITIK MASUK PROGRAM (setup & loop)
+//  Isinya sengaja pendek: cuma "merangkai" modul-modul lain.
 //  Untuk ubah nilai      -> Config.h
 //  Untuk ubah tombol     -> Controls.cpp
 //  Untuk ubah isi menu   -> Menu.cpp
@@ -68,5 +69,7 @@ void loop()
   displayTick(now);     // update OLED (throttle di dalam)
   debugTick(now);       // cetak serial (throttle di dalam)
 
-  delay(1); // yield ke scheduler FreeRTOS -> stack Bluetooth lebih stabil
+  // vTaskDelay yield bersih ke FreeRTOS scheduler (lebih baik dari delay(1))
+  // -> BT stack mendapat giliran CPU tepat waktu -> koneksi lebih stabil
+  vTaskDelay(1 / portTICK_PERIOD_MS);
 }

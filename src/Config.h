@@ -62,7 +62,7 @@
 //  TIMING (milidetik)
 // ------------------------------------------------------------
 #define DEADBAND     12   // ambang stik dianggap netral
-#define CONTROL_MS   5    // periode baca kontrol
+#define CONTROL_MS   2    // periode baca kontrol (2ms = tangkap tiap paket BT ~8ms)
 #define OLED_MS      120  // periode refresh OLED
 #define PRINT_MS     200  // periode cetak serial
 

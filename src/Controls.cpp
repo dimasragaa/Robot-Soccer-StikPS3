@@ -55,8 +55,11 @@ static void driveManual()
   int rawSteer = applyDeadband(Ps3.data.analog.stick.rx, DEADBAND);
   int rawThr   = applyDeadband(Ps3.data.analog.stick.ly, DEADBAND);
 
-  int steering = map(rawSteer, -128, 128, kec, -kec);
-  int throttle = map(rawThr,   -128, 128, kec, -kec);
+  // Ganti map() dengan formula langsung: lebih cepat, tanpa pembagian 256 di dalam map
+  // Stik PS3: -128..127. Formula: output = -raw * kec / 128
+  // (negatif karena stik atas = ly negatif = maju)
+  int throttle = -rawThr   * kec / 128;
+  int steering = -rawSteer * kec / 128;
   steering = steering * g_steerGain / 100;
   if (g_invert) steering = -steering;
 
@@ -75,7 +78,8 @@ static void driveManual()
 static void handleMenu(bool eL1, bool eR1, bool eUp, bool eDown,
                        bool eLeft, bool eRight, bool eCircle, bool eStart)
 {
-  stopMotorsSmooth(); // motor mati selama di menu
+  // Ramp motor ke 0 hanya kalau belum berhenti (hemat CPU & GPIO setiap tick)
+  if (curLeft != 0 || curRight != 0) stopMotorsSmooth();
 
   if (eL1)   { menuPage = (menuPage + MENU_COUNT - 1) % MENU_COUNT; menuItem = 0; oledDirty = true; }
   if (eR1)   { menuPage = (menuPage + 1) % MENU_COUNT;              menuItem = 0; oledDirty = true; }
