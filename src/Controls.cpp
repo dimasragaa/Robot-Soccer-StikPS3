@@ -40,6 +40,40 @@ int triggerSpeed(){
 }
 
 // ------------------------------------------------------------
+//  Bentuk input stik: deadband re-normalisasi + kurva expo
+//  raw: -128..127  ->  hasil: -1000..1000 (fixed point, 1000 = penuh)
+// ------------------------------------------------------------
+static int shapeInput(int raw)
+{
+  int a = abs(raw);
+  if (a < DEADBAND) return 0;
+
+  // [B] Re-normalisasi: mulai dari 0 tepat di tepi deadband (tanpa loncat)
+  int mag = (a - DEADBAND) * 1000 / (128 - DEADBAND);   // 0..1000
+  if (mag > 1000) mag = 1000;
+
+  // [C] Expo: campur linear & kubik -> tengah landai, ujung tetap penuh
+  long cube    = (long)mag * mag / 1000 * mag / 1000;    // (mag^3), 0..1000
+  int  shaped  = ((100 - EXPO_PCT) * mag + EXPO_PCT * (int)cube) / 100;
+
+  return (raw < 0) ? -shaped : shaped;
+}
+
+// ------------------------------------------------------------
+//  [E] Ramp asimetris: akselerasi halus, pengereman lebih gesit
+// ------------------------------------------------------------
+static int rampAxis(int cur, int tgt, int stepUp)
+{
+  int stepDn = stepUp * RAMP_BRAKE_X;
+  // "melambat" bila menuju 0 atau berganti arah
+  bool braking = (abs(tgt) < abs(cur)) || ((long)cur * tgt < 0);
+  int step = braking ? stepDn : stepUp;
+  if (cur < tgt) return min(cur + step, tgt);
+  if (cur > tgt) return max(cur - step, tgt);
+  return cur;
+}
+
+// ------------------------------------------------------------
 //  Kontrol manual: stik -> motor
 // ------------------------------------------------------------
 static void driveManual()
@@ -52,22 +86,34 @@ static void driveManual()
 
   handleKick(kickArmed && Ps3.data.button.triangle);  // kick = SEGITIGA
 
-  int rawSteer = applyDeadband(Ps3.data.analog.stick.rx, DEADBAND);
-  int rawThr   = applyDeadband(Ps3.data.analog.stick.ly, DEADBAND);
+  // [B][C] Bentuk input dulu (deadband mulus + expo), skala -1000..1000
+  int thr = shapeInput(Ps3.data.analog.stick.ly);
+  int str = shapeInput(Ps3.data.analog.stick.rx);
 
-  // Ganti map() dengan formula langsung: lebih cepat, tanpa pembagian 256 di dalam map
-  // Stik PS3: -128..127. Formula: output = -raw * kec / 128
-  // (negatif karena stik atas = ly negatif = maju)
-  int throttle = -rawThr   * kec / 128;
-  int steering = -rawSteer * kec / 128;
+  // Skala ke kecepatan aktif (stik atas = ly negatif = maju -> dibalik)
+  int throttle = -thr * kec / 1000;
+  int steering = -str * kec / 1000;
   steering = steering * g_steerGain / 100;
   if (g_invert) steering = -steering;
 
-  int targetL = constrain(throttle - steering, -255, 255);
-  int targetR = constrain(throttle + steering, -255, 255);
+  int targetL = throttle - steering;
+  int targetR = throttle + steering;
 
-  curLeft  = ramp(curLeft,  targetL, rampStep);
-  curRight = ramp(curRight, targetR, rampStep);
+  // [A] Mixing proporsional: jika meluap >255, kecilkan KEDUANYA seimbang
+  //     supaya rasio belok (selisih L-R) tetap terjaga di semua kecepatan
+  int m = max(abs(targetL), abs(targetR));
+  if (m > 255) {
+    targetL = targetL * 255 / m;
+    targetR = targetR * 255 / m;
+  }
+
+  // [D] Trim koreksi ketimpangan motor kiri/kanan
+  targetL = targetL * MOTOR_TRIM_L / 100;
+  targetR = targetR * MOTOR_TRIM_R / 100;
+
+  // [E] Ramp asimetris (halus saat gas, gesit saat rem/ganti arah)
+  curLeft  = rampAxis(curLeft,  targetL, rampStep);
+  curRight = rampAxis(curRight, targetR, rampStep);
   setMotorL(curLeft);
   setMotorR(curRight);
 }

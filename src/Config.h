@@ -95,6 +95,24 @@
 #define CREEP_RAMP_STEP   1   // naik/turun 1 PWM per tick (sangat halus)
 
 // ------------------------------------------------------------
+//  PENGHALUSAN & KESERASIAN GERAK  (fitur baru)
+// ------------------------------------------------------------
+// [C] Kurva EXPO respons stik: 0 = linear, makin besar makin landai di tengah.
+//     Bagus untuk kontrol presisi. 0..100. Coba 20-35.
+#define EXPO_PCT        25
+
+// [D] TRIM per motor untuk mengoreksi motor kiri/kanan yang beda kuat.
+//     100 = normal. Kalau robot narik ke KANAN saat maju lurus,
+//     berarti motor kiri lebih kuat -> KECILKAN MOTOR_TRIM_L (mis. 96).
+//     Kalau narik ke KIRI -> kecilkan MOTOR_TRIM_R.
+#define MOTOR_TRIM_L    100   // 90..100
+#define MOTOR_TRIM_R    100   // 90..100
+
+// [E] Pengereman lebih gesit dari akselerasi (kelipatan dari ramp step).
+//     2 = saat melambat/ganti arah, step 2x lebih cepat. 1 = simetris.
+#define RAMP_BRAKE_X    2
+
+// ------------------------------------------------------------
 //  AUTO-SEQUENCE
 //    X     : mundur -> maju lagi
 //    KOTAK : mundur -> putar KANAN
