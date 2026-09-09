@@ -1,0 +1,48 @@
+#pragma once
+#include <Arduino.h>
+
+// ============================================================
+//  State.h  —  ENUM & VARIABEL YANG DIPAKAI BERSAMA ANTAR FILE
+//  Ini "papan status" robot saat berjalan (bukan setelan tetap).
+//  Nilai awalnya di-set di State.cpp (diambil dari Config.h).
+// ============================================================
+
+// --- Status sistem ---
+enum SysState { ST_IDLE, ST_MENU, ST_RUN };
+
+// --- Jenis auto-sequence ---
+enum SeqType  { SQ_NONE, SQ_MUNDUR_MAJU, SQ_MUNDUR_KANAN, SQ_MUNDUR_KIRI };
+
+// --- Fase sequence: FASE1 = mundur, FASE2 = maju/putar ---
+enum SeqPhase { SEQ_IDLE, SEQ_FASE1, SEQ_FASE2 };
+
+// --- Parameter jalan (live, bisa berubah lewat menu Pengaturan) ---
+extern int  g_maxSpeed;
+extern int  g_steerGain;
+extern int  g_rampStep;
+extern bool g_invert;
+
+// --- Status sistem & koneksi ---
+extern SysState sysState;
+extern bool hasActiveMode;
+extern bool wasConnected;
+
+// --- Indeks menu ---
+extern uint8_t menuPage, menuItem;      // yang sedang di-navigasi
+extern uint8_t activeMenu, activeItem;  // mode yang sedang aktif
+
+// --- Kondisi motor sekarang (nilai PWM ter-ramp) ---
+extern int curLeft, curRight;
+
+// --- Status tendang ---
+extern bool kickArmed, kickActive;
+extern unsigned long kickStart;
+
+// --- Status sequence ---
+extern SeqType  seqType;
+extern SeqPhase seqState;
+extern unsigned long seqStart;
+
+// --- Flag & timer tampilan ---
+extern bool oledDirty;
+extern unsigned long lastControl, lastOled, lastPrint;
