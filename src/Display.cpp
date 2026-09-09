@@ -36,11 +36,9 @@
 //
 //  LAYAR MENU
 //   y  0-10  : header bar
-//   y 12-23  : item 0  (h=12)
-//   y 24-35  : item 1
-//   y 36-47  : item 2
-//   y 48-59  : item 3
-//   y 61-63  : hint kecil (terpotong 5px tapi tetap terbaca)
+//   y 12-23  : mode 0
+//   y 24-35  : mode 1
+//   y 50-63  : hint navigasi
 // ============================================================
 
 #if OLED_DRIVER == 2
@@ -175,7 +173,7 @@ static void drawDisconnected()
 //  14-23  bar motor L + angka
 //  26-35  bar motor R + angka
 //  38     divider
-//  41-48  status gerak (kiri) + RANGE RPM aktif (kanan)
+//  41-48  status gerak
 //  51     divider
 //  54-61  MAC controller
 // ============================================================
@@ -183,13 +181,12 @@ static void drawRun()
 {
   const char *modeName = menuItems[activeMenu][activeItem];
 
-  // Trigger aktif + range kecepatan (persen) sesuai stik saat ini
+  // Trigger aktif
   const char *trigStr = "--";
-  int pct = SPD_DEFAULT;
-  if      (Ps3.data.button.r2) { trigStr = "R2"; pct = SPD_R2; }
-  else if (Ps3.data.button.r1) { trigStr = "R1"; pct = SPD_R1; }
-  else if (Ps3.data.button.l2) { trigStr = "L2"; pct = CREEP_SPEED_PCT; }
-  else if (Ps3.data.button.l1) { trigStr = "L1"; pct = SPD_L1; }
+  if      (Ps3.data.button.r2) trigStr = "R2";
+  else if (Ps3.data.button.r1) trigStr = "R1";
+  else if (Ps3.data.button.l2) trigStr = "L2";
+  else if (Ps3.data.button.l1) trigStr = "L1";
 
   // --- Header ---
   header(modeName, trigStr);
@@ -213,7 +210,7 @@ static void drawRun()
                                         "PUTAR KIRI";
     display.print(label);
   }
-  else if (Ps3.data.button.l2) display.print("CREEP");
+  else if (Ps3.data.button.l2) display.print("L2");
   else if (kickArmed)          display.print("KICK");
   else                         display.print("MANUAL");
 
@@ -222,14 +219,6 @@ static void drawRun()
     display.setCursor(56, 41);
     display.print("INV");
   }
-
-  // range RPM aktif (kanan) — nilai maksimum PWM sesuai trigger
-  int rpmMax = g_maxSpeed * pct / 100;   // 0..255 sesuai stik
-  char rbuf[12];
-  snprintf(rbuf, sizeof(rbuf), "0-%d", rpmMax);
-  int rw = (int)strlen(rbuf) * 6;
-  display.setCursor(127 - rw, 41);
-  display.print(rbuf);
 
   // --- Divider + MAC ---
   hLine(51);
@@ -243,63 +232,20 @@ static void drawRun()
 // ============================================================
 static void drawMenu()
 {
-  // Header
   char hdr[22];
   snprintf(hdr, sizeof(hdr), "< %s >", menuTitle[menuPage]);
   header(hdr, "");
 
-  // 4 item (y=12,24,36,48 — masing-masing h=12)
+  // Hanya dua pilihan mode: Soccer dan Sumo
   for (uint8_t i = 0; i < menuLen[menuPage] && i < 4; i++)
-  {
-    if (menuPage == 2)
-    {
-      // Menu Pengaturan: nilai di kanan
-      char valBuf[8] = "";
-      int barVal = 0, barMax = 1;
-      switch (i)
-      {
-      case 0:
-        snprintf(valBuf, sizeof(valBuf), "%d", g_maxSpeed);
-        barVal = g_maxSpeed;
-        barMax = 255;
-        break;
-      case 1:
-        snprintf(valBuf, sizeof(valBuf), "%d%%", g_steerGain);
-        barVal = g_steerGain;
-        barMax = 120;
-        break;
-      case 2:
-        snprintf(valBuf, sizeof(valBuf), "%d", g_rampStep);
-        barVal = g_rampStep;
-        barMax = 12;
-        break;
-      case 3:
-        snprintf(valBuf, sizeof(valBuf), "%s", g_invert ? "ON" : "OFF");
-        barVal = g_invert ? 1 : 0;
-        barMax = 1;
-        break;
-      }
-      menuRow(i, menuItem, menuItems[menuPage][i], valBuf);
-      // Mini bar di bawah label kalau item ini tidak aktif
-      if (menuItem != i && i != 3)
-      {
-        int ry = 12 + i * 12;
-        hBar(barVal, barMax, 3, ry + 8, 60, 3);
-      }
-    }
-    else
-    {
-      menuRow(i, menuItem, menuItems[menuPage][i]);
-    }
-  }
+    menuRow(i, menuItem, menuItems[menuPage][i]);
 
-  // Footer hint HANYA kalau item < 4 (kalau 4 item, ruang habis -> skip biar tak terpotong)
-  if (menuLen[menuPage] < 4)
-  {
-    display.setTextSize(1);
-    display.setCursor(0, 55);
-    display.print("L1/R1  STA:ok  O:batal");
-  }
+  // Footer navigasi
+  display.setTextSize(1);
+  display.setCursor(0, 50);
+  display.print("UP/DOWN:mode  STA:pilih");
+  display.setCursor(0, 57);
+  display.print("O:batal");
 }
 
 // ============================================================

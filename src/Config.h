@@ -76,7 +76,7 @@
 //  Halaman: 0=POSISI START, 1=MODE MAIN, 2=PENGATURAN
 //  Item MODE MAIN: 0=Normal 1=Dribble 2=Attack 3=Defense
 // ------------------------------------------------------------
-#define DEFAULT_MENU  1
+#define DEFAULT_MENU  0
 #define DEFAULT_ITEM  0
 
 // ------------------------------------------------------------

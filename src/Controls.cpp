@@ -14,8 +14,8 @@
 //    X     : mundur -> maju          KOTAK : mundur -> putar KANAN
 //    BULAT : mundur -> putar KIRI    SELECT: buka/tutup menu
 //  Navigasi menu:
-//    L1/R1 : ganti halaman   UP/DOWN : pilih item
-//    LEFT/RIGHT : ubah nilai (hanya menu Pengaturan)
+//    UP/DOWN : pilih mode
+//    LEFT/RIGHT : tidak digunakan
 //    START : konfirmasi       BULAT : batal
 // ============================================================
 
@@ -127,29 +127,20 @@ static void handleMenu(bool eL1, bool eR1, bool eUp, bool eDown,
   // Ramp motor ke 0 hanya kalau belum berhenti (hemat CPU & GPIO setiap tick)
   if (curLeft != 0 || curRight != 0) stopMotorsSmooth();
 
-  if (eL1)   { menuPage = (menuPage + MENU_COUNT - 1) % MENU_COUNT; menuItem = 0; oledDirty = true; }
-  if (eR1)   { menuPage = (menuPage + 1) % MENU_COUNT;              menuItem = 0; oledDirty = true; }
+  // Hanya ada satu halaman MODE MAIN, jadi L1/R1 tidak melakukan apa-apa.
   if (eUp)   { menuItem = (menuItem + menuLen[menuPage] - 1) % menuLen[menuPage]; oledDirty = true; }
   if (eDown) { menuItem = (menuItem + 1) % menuLen[menuPage];                     oledDirty = true; }
-
-  // Left/Right hanya untuk menu Pengaturan (adjust nilai)
-  if (menuPage == 2) {
-    if (eLeft)  { adjustSetting(-1); oledDirty = true; }
-    if (eRight) { adjustSetting(+1); oledDirty = true; }
-  }
 
   if (eCircle) { sysState = hasActiveMode ? ST_RUN : ST_IDLE; oledDirty = true; } // batal
 
   if (eStart)  // konfirmasi
   {
-    if (menuPage <= 1) {           // pilih MODE -> masuk RUN
-      activeMenu = menuPage; activeItem = menuItem;
-      hasActiveMode = true;
-      applyModePreset();
-      sysState = ST_RUN;
-    } else {                        // menu Pengaturan -> simpan & keluar
-      sysState = hasActiveMode ? ST_RUN : ST_IDLE;
-    }
+    // Pilih MODE -> masuk RUN
+    activeMenu = menuPage;
+    activeItem = menuItem;
+    hasActiveMode = true;
+    applyModePreset();
+    sysState = ST_RUN;
     oledDirty = true;
   }
 }
