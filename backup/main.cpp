@@ -24,19 +24,17 @@
 #define MOTOR_FREQ 20000
 #define MOTOR_RES  8
 
-// --- Motor 1 (KIRI) : driver BTN -> D1, D2, PWM1 ---
-#define M1_D1   25   // arah 1
-#define M1_D2   26   // arah 2
-#define M1_PWM  27   // kecepatan (PWM 1)
+// --- Left Motor (BTS7960) ---
+#define RPWM  32
+#define RLPWM 33
+// --- Right Motor (BTS7960) ---
+#define LPWM  25
+#define LLPWM 26
 
-// --- Motor 2 (KANAN) : driver BTN -> D3, D4, PWM2 ---
-#define M2_D3   32   // arah 1
-#define M2_D4   33   // arah 2
-#define M2_PWM  14   // kecepatan (PWM 2)
-
-// Kanal LEDC untuk pin PWM (1 kanal per motor)
-#define M1_CH   0
-#define M2_CH   1
+#define LPWM_CH  0
+#define LLPWM_CH 1
+#define RPWM_CH  2
+#define RLPWM_CH 3
 
 #define LED      2
 #define KICK_PIN 18
@@ -58,16 +56,8 @@ const unsigned long PRINT_MS   = 200; // periode cetak serial
 //  STATE MACHINE
 // ============================================================
 enum SysState { ST_IDLE, ST_MENU, ST_RUN };
-
-// MODE DEFAULT saat stik baru konek (tanpa perlu tekan SELECT/START).
-// 1 = halaman "MODE MAIN", 0 = item "Normal".  Ganti di sini kalau mau
-// default-nya Dribble (1), Attack (2), atau Defense (3).
-const uint8_t DEFAULT_MENU = 1;
-const uint8_t DEFAULT_ITEM = 0;
-
-SysState sysState = ST_RUN;     // langsung siap jalan
-bool hasActiveMode = true;      // sudah punya mode aktif sejak awal
-bool wasConnected  = false;     // untuk deteksi transisi konek/putus
+SysState sysState = ST_IDLE;
+bool hasActiveMode = false;
 
 // --- Struktur menu ---
 const uint8_t MENU_COUNT = 3;
@@ -81,7 +71,7 @@ const char* menuItems[MENU_COUNT][4] = {
 
 uint8_t menuPage = 0;   // menu 1/2/3
 uint8_t menuItem = 0;   // item terpilih
-uint8_t activeMenu = DEFAULT_MENU, activeItem = DEFAULT_ITEM;
+uint8_t activeMenu = 0, activeItem = 0;
 
 // ============================================================
 //  MOTOR & KICK STATE
@@ -96,30 +86,15 @@ const unsigned long KICK_MS = 120;
 // ============================================================
 //  AUTO-SEQUENCE (tombol X: mundur -> puter kiri)
 // ============================================================
-// Jenis sequence (dipilih lewat tombol):
-//   SQ_NONE          : tidak ada sequence berjalan
-//   SQ_MUNDUR_MAJU   : tombol X      -> mundur 1 detik, lalu maju lagi
-//   SQ_MUNDUR_KANAN  : tombol KOTAK  -> mundur, lalu putar ke KANAN
-//   SQ_MUNDUR_KIRI   : tombol BULAT  -> mundur, lalu putar ke KIRI
-enum SeqType  { SQ_NONE, SQ_MUNDUR_MAJU, SQ_MUNDUR_KANAN, SQ_MUNDUR_KIRI };
-enum SeqPhase { SEQ_IDLE, SEQ_FASE1, SEQ_FASE2 };   // FASE1 = mundur, FASE2 = maju/putar
-
-SeqType  seqType  = SQ_NONE;
-SeqPhase seqState = SEQ_IDLE;
+enum SeqState { SEQ_IDLE, SEQ_MUNDUR, SEQ_PUTAR };
+SeqState seqState  = SEQ_IDLE;
 unsigned long seqStart = 0;
 
 // === KONSTANTA WAKTU — ubah di sini untuk kalibrasi ===
-// --- Tombol X : mundur 1 detik lalu maju lagi ---
-const unsigned long SEQX_MUNDUR_MS = 1000; // mundur 1 detik
-const unsigned long SEQX_MAJU_MS   = 1000; // lalu maju 1 detik
-
-// --- Tombol KOTAK / BULAT : mundur lalu putar ---
-const unsigned long SEQ_MUNDUR_MS  = 300;  // durasi mundur
-const unsigned long SEQ_PUTAR_MS   = 500;  // durasi putar
-
+const unsigned long SEQ_MUNDUR_MS = 300; // mundur 1 detik
+const unsigned long SEQ_PUTAR_MS  = 500; // putar kiri 2 detik
 // Kecepatan saat sequence (0..255) — turunkan kalau terlalu jauh/banyak
 const int SEQ_SPEED_MUNDUR = 180;
-const int SEQ_SPEED_MAJU   = 180;
 const int SEQ_SPEED_PUTAR  = 150;
 
 unsigned long lastControl = 0, lastOled = 0, lastPrint = 0;
@@ -128,8 +103,7 @@ bool oledDirty = true;
 // ============================================================
 //  EDGE DETECTION TOMBOL  (1 tekan = 1 aksi)
 // ============================================================
-bool pSelect=0, pStart=0, pUp=0, pDown=0, pLeft=0, pRight=0, pL1=0, pR1=0;
-bool pCircle=0, pCross=0, pSquare=0;
+bool pSelect=0, pStart=0, pUp=0, pDown=0, pLeft=0, pRight=0, pL1=0, pR1=0, pCircle=0, pCross=0;
 bool edge(bool now, bool &prev){ bool e = now && !prev; prev = now; return e; }
 
 // ============================================================
@@ -137,16 +111,12 @@ bool edge(bool now, bool &prev){ bool e = now && !prev; prev = now; return e; }
 // ============================================================
 int  applyDeadband(int v, int t);
 int  ramp(int cur, int tgt, int step);
-void setMotor(uint8_t d1, uint8_t d2, uint8_t ch, int spd);
-void setMotorL(int spd);
-void setMotorR(int spd);
+void setMotor(uint8_t f, uint8_t r, int spd);
 void stopMotorsSmooth();
 void handleKick(bool trigger);
 void applyModePreset();
-void startDefaultMode();
 void adjustSetting(int dir);
 void runSequence();
-void mulaiSequence(SeqType t, const char* nama);
 void drawOLED();
 void printSerial();
 
@@ -154,8 +124,7 @@ void printSerial();
 //  CALLBACK KONEKSI PS3
 // ============================================================
 void onConnect()    { digitalWrite(LED, HIGH); Serial.println(">> PS3 CONNECTED");    oledDirty = true; }
-void onDisconnect() { digitalWrite(LED, LOW);  Serial.println(">> PS3 DISCONNECTED");
-                      wasConnected = false; oledDirty = true; }
+void onDisconnect() { digitalWrite(LED, LOW);  Serial.println(">> PS3 DISCONNECTED"); oledDirty = true; }
 
 // ============================================================
 //  SETUP
@@ -175,16 +144,10 @@ void setup()
   pinMode(KICK_PIN, OUTPUT);
   digitalWrite(KICK_PIN, LOW);
 
-  // Pin arah = output digital biasa
-  pinMode(M1_D1, OUTPUT); pinMode(M1_D2, OUTPUT);
-  pinMode(M2_D3, OUTPUT); pinMode(M2_D4, OUTPUT);
-  digitalWrite(M1_D1, LOW); digitalWrite(M1_D2, LOW);
-  digitalWrite(M2_D3, LOW); digitalWrite(M2_D4, LOW);
-
-  // Pin kecepatan = PWM (LEDC)
-  ledcSetup(M1_CH, MOTOR_FREQ, MOTOR_RES); ledcAttachPin(M1_PWM, M1_CH);
-  ledcSetup(M2_CH, MOTOR_FREQ, MOTOR_RES); ledcAttachPin(M2_PWM, M2_CH);
-  ledcWrite(M1_CH, 0); ledcWrite(M2_CH, 0);
+  ledcSetup(LPWM_CH,  MOTOR_FREQ, MOTOR_RES); ledcAttachPin(LPWM,  LPWM_CH);
+  ledcSetup(LLPWM_CH, MOTOR_FREQ, MOTOR_RES); ledcAttachPin(LLPWM, LLPWM_CH);
+  ledcSetup(RPWM_CH,  MOTOR_FREQ, MOTOR_RES); ledcAttachPin(RPWM,  RPWM_CH);
+  ledcSetup(RLPWM_CH, MOTOR_FREQ, MOTOR_RES); ledcAttachPin(RLPWM, RLPWM_CH);
   stopMotorsSmooth();
 
 #if USE_OLED
@@ -195,11 +158,8 @@ void setup()
   else Serial.println("OLED tidak terdeteksi, lanjut tanpa OLED");
 #endif
 
-  applyModePreset();   // siapkan parameter mode default sebelum stik konek
-
   Ps3.attachOnConnect(onConnect);
-  Ps3.attachOnDisconnect(onDisconnect);
-  Ps3.begin("5c:6d:21:55:e7:37"); // MAC address (controller harus dipair ke MAC ini)
+  Ps3.begin("f8:2f:a8:89:f9:83"); // MAC address (controller harus dipair ke MAC ini)
   Serial.println("SETUP DONE");
 }
 
@@ -215,12 +175,7 @@ void loop()
   {
     lastControl = now;
 
-    // ---- Begitu stik konek: langsung masuk mode jalan, tanpa SELECT/START ----
-    bool nowConnected = Ps3.isConnected();
-    if (nowConnected && !wasConnected) startDefaultMode();
-    wasConnected = nowConnected;
-
-    if (!nowConnected)
+    if (!Ps3.isConnected())
     {
       stopMotorsSmooth();          // fail-safe: berhenti mulus saat putus
     }
@@ -237,7 +192,6 @@ void loop()
       bool eR1     = edge(Ps3.data.button.r1,     pR1);
       bool eCircle = edge(Ps3.data.button.circle, pCircle);
       bool eCross  = edge(Ps3.data.button.cross,  pCross);
-      bool eSquare = edge(Ps3.data.button.square, pSquare);
 
       // ---- SELECT: buka/tutup menu dari mana saja ----
       if (eSelect)
@@ -279,13 +233,19 @@ void loop()
       }
       else if (sysState == ST_RUN)
       {
-        // --- Tombol sequence (tekan lagi tombol yang sama = batal) ---
-        //  X     : mundur 1 detik -> maju lagi
-        //  KOTAK : mundur -> putar KANAN
-        //  BULAT : mundur -> putar KIRI
-        if (eCross)  mulaiSequence(SQ_MUNDUR_MAJU,  "mundur 1 detik -> maju");
-        if (eSquare) mulaiSequence(SQ_MUNDUR_KANAN, "mundur -> putar KANAN");
-        if (eCircle) mulaiSequence(SQ_MUNDUR_KIRI,  "mundur -> putar KIRI");
+        // --- Tombol X: mulai sequence (bisa di-cancel tombol X lagi) ---
+        if (eCross) {
+          if (seqState == SEQ_IDLE) {
+            seqState = SEQ_MUNDUR;   // mulai sequence
+            seqStart = millis();
+            Serial.println("[SEQ] Mulai: mundur 3 detik...");
+            oledDirty = true;
+          } else {
+            seqState = SEQ_IDLE;     // cancel sequence
+            Serial.println("[SEQ] Dibatalkan");
+            oledDirty = true;
+          }
+        }
 
         // --- Jalankan sequence non-blocking ---
         if (seqState != SEQ_IDLE) {
@@ -295,10 +255,10 @@ void loop()
           int kec = g_maxSpeed * 50 / 100;
           if      (Ps3.data.button.r2) kec = g_maxSpeed;
           else if (Ps3.data.button.r1) kec = g_maxSpeed * 75 / 100;
-          else if (Ps3.data.button.l2) kec = g_maxSpeed * 50 / 100;
+          else if (Ps3.data.button.l2) kec = g_maxSpeed * 12 / 100;
           else if (Ps3.data.button.l1) kec = g_maxSpeed * 25 / 100;
 
-          handleKick(kickArmed && Ps3.data.button.triangle);  // kick pindah ke SEGITIGA
+          handleKick(kickArmed && Ps3.data.button.square);
 
           int rawSteer = applyDeadband(Ps3.data.analog.stick.rx, DEADBAND);
           int rawThr   = applyDeadband(Ps3.data.analog.stick.ly, DEADBAND);
@@ -313,8 +273,8 @@ void loop()
 
           curLeft  = ramp(curLeft,  targetL, g_rampStep);
           curRight = ramp(curRight, targetR, g_rampStep);
-          setMotorL(curLeft);
-          setMotorR(curRight);
+          setMotor(LPWM_CH, LLPWM_CH, curLeft);
+          setMotor(RPWM_CH, RLPWM_CH, curRight);
         }
       }
       else // ST_IDLE
@@ -335,29 +295,6 @@ void loop()
   if (now - lastPrint >= PRINT_MS) { lastPrint = now; printSerial(); }
 
   delay(1); // yield ke scheduler FreeRTOS -> stack Bluetooth lebih stabil
-}
-
-// ============================================================
-//  MASUK MODE JALAN OTOMATIS (dipanggil saat stik baru konek)
-// ============================================================
-void startDefaultMode()
-{
-  activeMenu = DEFAULT_MENU;
-  activeItem = DEFAULT_ITEM;
-  hasActiveMode = true;
-  applyModePreset();
-
-  // pastikan mulai dari kondisi bersih
-  seqState = SEQ_IDLE;
-  seqType  = SQ_NONE;
-  curLeft = curRight = 0;
-  setMotorL(0);
-  setMotorR(0);
-
-  sysState = ST_RUN;
-  oledDirty = true;
-  Serial.printf(">> Stik konek -> langsung RUN (mode: %s)\n",
-                menuItems[activeMenu][activeItem]);
 }
 
 // ============================================================
@@ -394,80 +331,43 @@ void adjustSetting(int dir)
 }
 
 // ============================================================
-//  MULAI / BATALKAN SEQUENCE
-//  Tekan tombol yang sama saat sequence-nya jalan = batal.
-//  Tekan tombol lain saat sequence jalan = ganti ke sequence itu.
-// ============================================================
-void mulaiSequence(SeqType t, const char* nama)
-{
-  if (seqState != SEQ_IDLE && seqType == t) {   // tombol sama ditekan -> batal
-    seqState = SEQ_IDLE;
-    seqType  = SQ_NONE;
-    Serial.println("[SEQ] Dibatalkan");
-  } else {
-    seqType  = t;
-    seqState = SEQ_FASE1;                       // fase 1 selalu mundur
-    seqStart = millis();
-    Serial.printf("[SEQ] Mulai: %s\n", nama);
-  }
-  oledDirty = true;
-}
-
-// ============================================================
-//  AUTO-SEQUENCE 2 FASE (non-blocking, murni berbasis millis)
-//    FASE1 = mundur
-//    FASE2 = maju / putar kanan / putar kiri, tergantung seqType
+//  AUTO-SEQUENCE: mundur 3 detik -> putar kiri 2 detik
+//  Dipanggil tiap tick selama seqState != SEQ_IDLE
+//  Tidak pakai delay — murni state machine berbasis millis
 // ============================================================
 void runSequence()
 {
   unsigned long elapsed = millis() - seqStart;
 
-  // Durasi tiap fase tergantung jenis sequence
-  unsigned long durMundur = (seqType == SQ_MUNDUR_MAJU) ? SEQX_MUNDUR_MS : SEQ_MUNDUR_MS;
-  unsigned long durFase2  = (seqType == SQ_MUNDUR_MAJU) ? SEQX_MAJU_MS   : SEQ_PUTAR_MS;
-
-  if (seqState == SEQ_FASE1)
+  if (seqState == SEQ_MUNDUR)
   {
     // Kedua motor mundur (nilai negatif = mundur)
-    curLeft  = ramp(curLeft,  -SEQ_SPEED_MUNDUR, g_rampStep);
-    curRight = ramp(curRight, -SEQ_SPEED_MUNDUR, g_rampStep);
-    setMotorL(curLeft);
-    setMotorR(curRight);
+    int target = -SEQ_SPEED_MUNDUR;
+    curLeft  = ramp(curLeft,  target, g_rampStep);
+    curRight = ramp(curRight, target, g_rampStep);
+    setMotor(LPWM_CH, LLPWM_CH, curLeft);
+    setMotor(RPWM_CH, RLPWM_CH, curRight);
 
-    if (elapsed >= durMundur) {
-      seqState = SEQ_FASE2;
-      seqStart = millis();   // reset timer untuk fase berikutnya
-      Serial.println(seqType == SQ_MUNDUR_MAJU  ? "[SEQ] Mundur selesai -> maju lagi..."   :
-                     seqType == SQ_MUNDUR_KANAN ? "[SEQ] Mundur selesai -> putar KANAN..." :
-                                                  "[SEQ] Mundur selesai -> putar KIRI...");
+    if (elapsed >= SEQ_MUNDUR_MS) {
+      seqState = SEQ_PUTAR;
+      seqStart = millis(); // reset timer untuk fase berikutnya
+      Serial.println("[SEQ] Selesai mundur -> putar kiri 2 detik...");
       oledDirty = true;
     }
   }
-  else if (seqState == SEQ_FASE2)
+  else if (seqState == SEQ_PUTAR)
   {
-    int tgtL, tgtR;
-    if (seqType == SQ_MUNDUR_MAJU) {
-      // Kedua motor maju
-      tgtL =  SEQ_SPEED_MAJU;  tgtR =  SEQ_SPEED_MAJU;
-    } else if (seqType == SQ_MUNDUR_KANAN) {
-      // Putar KANAN di tempat: motor kiri maju, motor kanan mundur
-      tgtL =  SEQ_SPEED_PUTAR; tgtR = -SEQ_SPEED_PUTAR;
-    } else {
-      // Putar KIRI di tempat: motor kiri mundur, motor kanan maju
-      tgtL = -SEQ_SPEED_PUTAR; tgtR =  SEQ_SPEED_PUTAR;
-    }
+    // Putar kiri di tempat: motor kiri mundur, motor kanan maju
+    curLeft  = ramp(curLeft,  -SEQ_SPEED_PUTAR, g_rampStep);
+    curRight = ramp(curRight,  SEQ_SPEED_PUTAR, g_rampStep);
+    setMotor(LPWM_CH, LLPWM_CH, curLeft);
+    setMotor(RPWM_CH, RLPWM_CH, curRight);
 
-    curLeft  = ramp(curLeft,  tgtL, g_rampStep);
-    curRight = ramp(curRight, tgtR, g_rampStep);
-    setMotorL(curLeft);
-    setMotorR(curRight);
-
-    if (elapsed >= durFase2) {
-      seqState = SEQ_IDLE;   // sequence selesai
-      seqType  = SQ_NONE;
+    if (elapsed >= SEQ_PUTAR_MS) {
+      seqState = SEQ_IDLE;  // sequence selesai
       curLeft = curRight = 0;
-      setMotorL(0);
-      setMotorR(0);
+      setMotor(LPWM_CH, LLPWM_CH, 0);
+      setMotor(RPWM_CH, RLPWM_CH, 0);
       Serial.println("[SEQ] Selesai! Kembali ke kontrol manual.");
       oledDirty = true;
     }
@@ -517,17 +417,16 @@ void drawOLED()
     display.print(" Str:"); display.print(g_steerGain); display.println("%");
     display.setCursor(0,28); display.print("L:"); display.print(curLeft);
     display.print("  R:"); display.print(curRight);
-    if (seqState == SEQ_FASE1) {
-      display.setCursor(0,40); display.print(">> MUNDUR...");
-    } else if (seqState == SEQ_FASE2) {
-      display.setCursor(0,40);
-      display.print(seqType == SQ_MUNDUR_MAJU  ? ">> MAJU..."        :
-                    seqType == SQ_MUNDUR_KANAN ? ">> PUTAR KANAN..." :
-                                                 ">> PUTAR KIRI...");
+    if (seqState == SEQ_MUNDUR) {
+      unsigned long sisa = (SEQ_MUNDUR_MS - (millis() - seqStart)) / 1000 + 1;
+      display.setCursor(0,40); display.printf(">> MUNDUR... %lus", sisa);
+    } else if (seqState == SEQ_PUTAR) {
+      unsigned long sisa = (SEQ_PUTAR_MS - (millis() - seqStart)) / 1000 + 1;
+      display.setCursor(0,40); display.printf(">> PUTAR KIRI... %lus", sisa);
     } else if (kickArmed) {
-      display.setCursor(0,40); display.print("KICK ARMED (segitiga)");
+      display.setCursor(0,40); display.print("KICK ARMED (kotak)");
     }
-    display.setCursor(0,56); display.print("X:mjr  []:kanan  O:kiri");
+    display.setCursor(0,56); display.print("SELECT:menu  X:mundur");
   }
   else { // IDLE
     display.setTextSize(2); display.setCursor(0,4);  display.println("READY");
@@ -549,30 +448,17 @@ int ramp(int cur, int tgt, int step){
   return cur;
 }
 
-// Driver BTN: 2 pin arah (D1/D2) + 1 pin PWM kecepatan.
-// spd > 0 = maju, spd < 0 = mundur, spd = 0 = berhenti (brake).
-void setMotor(uint8_t d1, uint8_t d2, uint8_t ch, int spd){
-  spd = constrain(spd, -255, 255);
-  if (spd > 0){
-    digitalWrite(d1, HIGH); digitalWrite(d2, LOW);
-    ledcWrite(ch, spd);
-  } else if (spd < 0){
-    digitalWrite(d1, LOW);  digitalWrite(d2, HIGH);
-    ledcWrite(ch, -spd);
-  } else {
-    digitalWrite(d1, LOW);  digitalWrite(d2, LOW);
-    ledcWrite(ch, 0);
-  }
+void setMotor(uint8_t f, uint8_t r, int spd){
+  if (spd > 0){ ledcWrite(f, spd);  ledcWrite(r, 0); }
+  else if (spd < 0){ ledcWrite(f, 0); ledcWrite(r, -spd); }
+  else { ledcWrite(f, 0); ledcWrite(r, 0); }
 }
-
-void setMotorL(int spd){ setMotor(M1_D1, M1_D2, M1_CH, spd); }  // Motor 1
-void setMotorR(int spd){ setMotor(M2_D3, M2_D4, M2_CH, spd); }  // Motor 2
 
 void stopMotorsSmooth(){
   curLeft  = ramp(curLeft,  0, g_rampStep);
   curRight = ramp(curRight, 0, g_rampStep);
-  setMotorL(curLeft);
-  setMotorR(curRight);
+  setMotor(LPWM_CH, LLPWM_CH, curLeft);
+  setMotor(RPWM_CH, RLPWM_CH, curRight);
 }
 
 void handleKick(bool trigger){
@@ -600,7 +486,7 @@ void printSerial()
     int kec = g_maxSpeed * 50 / 100;
     if      (Ps3.data.button.r2) kec = g_maxSpeed;
     else if (Ps3.data.button.r1) kec = g_maxSpeed * 75 / 100;
-    else if (Ps3.data.button.l2) kec = g_maxSpeed * 50 / 100;
+    else if (Ps3.data.button.l2) kec = g_maxSpeed * 12 / 100;
     else if (Ps3.data.button.l1) kec = g_maxSpeed * 25 / 100;
 
     Serial.printf("[RUN] mode=%s | rx=%4d ly=%4d | kec=%3d | L=%4d R=%4d | max=%d steer=%d%% ramp=%d inv=%s kick=%s\n",
