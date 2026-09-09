@@ -70,7 +70,11 @@ static void drawOLED()
     } else if (kickArmed) {
       display.setCursor(0,40); display.print("KICK ARMED (segitiga)");
     }
-    display.setCursor(0,56); display.print("X:mjr  []:kanan  O:kiri");
+    if (Ps3.data.button.l2) {
+      display.setCursor(0,56); display.print(">> CREEP MODE (L2) <<");
+    } else {
+      display.setCursor(0,56); display.print("X:mjr  []:kanan  O:kiri");
+    }
   }
   else { // IDLE
     display.setTextSize(2); display.setCursor(0,4);  display.println("READY");

@@ -27,12 +27,14 @@ static bool edge(bool now, bool &prev){ bool e = now && !prev; prev = now; retur
 
 // ------------------------------------------------------------
 //  Kecepatan aktif dari trigger (persen di Config.h)
+//  Catatan: L2 (creep) tidak masuk sini karena juga butuh ramp khusus.
+//  Fungsi ini dipakai untuk Serial Monitor & tampilan saja.
 // ------------------------------------------------------------
 int triggerSpeed(){
   int kec = g_maxSpeed * SPD_DEFAULT / 100;
   if      (Ps3.data.button.r2) kec = g_maxSpeed * SPD_R2 / 100;
   else if (Ps3.data.button.r1) kec = g_maxSpeed * SPD_R1 / 100;
-  else if (Ps3.data.button.l2) kec = g_maxSpeed * SPD_L2 / 100;
+  else if (Ps3.data.button.l2) kec = g_maxSpeed * CREEP_SPEED_PCT / 100;
   else if (Ps3.data.button.l1) kec = g_maxSpeed * SPD_L1 / 100;
   return kec;
 }
@@ -42,7 +44,11 @@ int triggerSpeed(){
 // ------------------------------------------------------------
 static void driveManual()
 {
-  int kec = triggerSpeed();
+  bool creepMode = Ps3.data.button.l2;
+
+  // Saat creep: kecepatan ceiling rendah + ramp sangat halus
+  int kec      = creepMode ? (g_maxSpeed * CREEP_SPEED_PCT / 100) : triggerSpeed();
+  int rampStep = creepMode ? CREEP_RAMP_STEP : g_rampStep;
 
   handleKick(kickArmed && Ps3.data.button.triangle);  // kick = SEGITIGA
 
@@ -57,8 +63,8 @@ static void driveManual()
   int targetL = constrain(throttle - steering, -255, 255);
   int targetR = constrain(throttle + steering, -255, 255);
 
-  curLeft  = ramp(curLeft,  targetL, g_rampStep);
-  curRight = ramp(curRight, targetR, g_rampStep);
+  curLeft  = ramp(curLeft,  targetL, rampStep);
+  curRight = ramp(curRight, targetR, rampStep);
   setMotorL(curLeft);
   setMotorR(curRight);
 }

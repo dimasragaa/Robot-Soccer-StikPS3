@@ -3,6 +3,7 @@
 
 // ============================================================
 //  Config.h  —  SATU-SATUNYA TEMPAT UBAH NILAI / KALIBRASI
+//  Semua angka yang mungkin ingin kamu utak-atik ada di sini.
 //  File lain TIDAK perlu disentuh untuk sekadar ganti pin/kecepatan.
 // ============================================================
 
@@ -35,7 +36,7 @@
 // ------------------------------------------------------------
 //  PWM MOTOR
 // ------------------------------------------------------------
-#define MOTOR_FREQ 20000   // 20 kHz 
+#define MOTOR_FREQ 20000   // 20 kHz (senyap, aman untuk BTN)
 #define MOTOR_RES  8       // 8-bit -> nilai 0..255
 
 // ------------------------------------------------------------
@@ -84,9 +85,14 @@
 // ------------------------------------------------------------
 #define SPD_R2       100  // R2 ditekan  -> full
 #define SPD_R1       75   // R1 ditekan
-#define SPD_L2       50   // L2 ditekan
 #define SPD_L1       25   // L1 ditekan
 #define SPD_DEFAULT  50   // tidak ada trigger ditekan
+
+// --- MODE CREEP (L2) : merayap perlahan untuk pendekatan bola ---
+// Kecepatan maksimal saat creep (% dari g_maxSpeed). Kecilkan untuk lebih lambat.
+#define CREEP_SPEED_PCT  18   // ~18% dari maxSpeed (misal 255 -> ~46 PWM)
+// Ramp step khusus creep: makin kecil makin halus akselerasinya
+#define CREEP_RAMP_STEP   1   // naik/turun 1 PWM per tick (sangat halus)
 
 // ------------------------------------------------------------
 //  AUTO-SEQUENCE
