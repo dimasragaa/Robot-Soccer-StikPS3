@@ -3,6 +3,8 @@
 
 // ============================================================
 //  Motor.h  —  KENDALI HARDWARE MOTOR (driver BTN)
+//
+//  By: github.com/dimasragaa — IG: @dmsragaa
 // ============================================================
 
 // Siapkan pin arah + PWM. Panggil sekali di setup().

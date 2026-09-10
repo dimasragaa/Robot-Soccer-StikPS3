@@ -3,6 +3,8 @@
 Program yang tadinya satu file panjang, sekarang dipecah per fungsi.
 **Aturan sederhana: mau ubah sesuatu → buka file yang namanya sesuai.**
 
+**By:** [github.com/dimasragaa](https://github.com/dimasragaa) — Instagram: [@dmsragaa](https://instagram.com/dmsragaa)
+
 ## Struktur file
 
 | File | Isi | Buka kalau mau ubah... |

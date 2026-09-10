@@ -1,3 +1,4 @@
+// By: github.com/dimasragaa — IG: @dmsragaa
 #include "Controls.h"
 #include <Ps3Controller.h>
 #include "Config.h"

@@ -5,6 +5,8 @@
 //  State.h  —  ENUM & VARIABEL YANG DIPAKAI BERSAMA ANTAR FILE
 //  Ini "papan status" robot saat berjalan (bukan setelan tetap).
 //  Nilai awalnya di-set di State.cpp (diambil dari Config.h).
+//
+//  By: github.com/dimasragaa — IG: @dmsragaa
 // ============================================================
 
 // --- Status sistem ---

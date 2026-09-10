@@ -4,6 +4,8 @@
 // ============================================================
 //  Controls.h  —  SEMUA LOGIKA TOMBOL & STIK ADA DI SINI
 //  Kalau mau ubah "tombol apa melakukan apa", buka Controls.cpp.
+//
+//  By: github.com/dimasragaa — IG: @dmsragaa
 // ============================================================
 
 // Dipanggil tiap tick kontrol dari loop().

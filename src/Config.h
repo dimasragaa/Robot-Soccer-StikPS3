@@ -5,6 +5,8 @@
 //  Config.h  —  SATU-SATUNYA TEMPAT UBAH NILAI / KALIBRASI
 //  Semua angka yang mungkin ingin kamu utak-atik ada di sini.
 //  File lain TIDAK perlu disentuh untuk sekadar ganti pin/kecepatan.
+//
+//  By: github.com/dimasragaa — IG: @dmsragaa
 // ============================================================
 
 // ------------------------------------------------------------

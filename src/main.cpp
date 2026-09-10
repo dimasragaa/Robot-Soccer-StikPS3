@@ -6,6 +6,8 @@
 //  Untuk ubah isi menu   -> Menu.cpp
 //  Untuk ubah sequence   -> Sequence.cpp
 //  Untuk ubah tampilan   -> Display.cpp
+//
+//  By: github.com/dimasragaa — IG: @dmsragaa
 // ============================================================
 #include <Arduino.h>
 #include <Ps3Controller.h>

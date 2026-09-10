@@ -1,3 +1,4 @@
+// By: github.com/dimasragaa — IG: @dmsragaa
 #include "Sequence.h"
 #include "Config.h"
 #include "State.h"

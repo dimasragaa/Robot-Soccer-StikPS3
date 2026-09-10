@@ -5,6 +5,8 @@
 // ============================================================
 //  Sequence.h  —  GERAKAN OTOMATIS 2 FASE (mundur -> maju/putar)
 //  Durasi & kecepatan-nya diatur di Config.h (SEQ_* / SEQX_*).
+//
+//  By: github.com/dimasragaa — IG: @dmsragaa
 // ============================================================
 
 // Mulai / batalkan sequence. Tekan tombol yang sama saat jalan = batal.
