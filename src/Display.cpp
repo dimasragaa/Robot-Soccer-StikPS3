@@ -262,11 +262,15 @@ static void drawMenu()
     menuRow(i, menuItem, menuItems[menuPage][i]);
 
   // Footer navigasi
+  // Catatan: layar 128px lebar = maks 21 karakter di textSize(1) (6px/karakter).
+  // Baris lama "UP/DOWN:mode  STA:pilih" = 23 karakter -> kepanjangan 2 karakter,
+  // jadi ke-wrap sendiri oleh Adafruit_GFX dan tabrakan sama baris "O:batal"
+  // di bawahnya -> itu sebabnya kelihatan berantakan. Diperpendek supaya pas.
   display.setTextSize(1);
   display.setCursor(0, 50);
-  display.print("UP/DOWN:mode  STA:pilih");
+  display.print("UP/DOWN:pilih mode");
   display.setCursor(0, 57);
-  display.print("O:batal");
+  display.print("START:OK  O:batal");
 }
 
 // ============================================================
