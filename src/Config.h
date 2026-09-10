@@ -94,6 +94,17 @@
 #define SPEED_SET_MAX   255   // batas atas
 #define SPEED_SET_STEP  5     // besar loncatan tiap tekan KIRI/KANAN
 
+// Steering (sensitivitas belok, g_steerGain) — sama seperti Max Speed:
+// DISIMPAN permanen ke flash begitu diubah. Konsekuensinya: begitu kamu
+// atur manual, angka itu jadi milik pengguna dan dipakai di MODE APA PUN
+// (Soccer/Sumo tidak lagi otomatis pasang 100%/110% bawaan masing-masing
+// — lihat applyModePreset() di Menu.cpp). Kehalusan gerak (g_rampStep)
+// TIDAK diubah lewat menu ini, tetap beda per mode seperti semula
+// (Soccer=6, Sumo=10), karena itu bukan parameter belok.
+#define STEER_SET_MIN   50    // belok paling landai
+#define STEER_SET_MAX   200   // belok paling tajam
+#define STEER_SET_STEP  5
+
 // ------------------------------------------------------------
 //  TIMING (milidetik)
 // ------------------------------------------------------------

@@ -254,7 +254,12 @@ static void drawRun()
 static void drawMenu()
 {
   char hdr[22];
-  snprintf(hdr, sizeof(hdr), "< %s >", menuTitle[menuPage]);
+  if (menuPage == MENU_PAGE_PENGATURAN)
+    // Di layar pengaturan, judul pakai nama mode yang baru dipilih
+    // (bukan "PENGATURAN" generik) supaya jelas ini setelan UNTUK mode itu.
+    snprintf(hdr, sizeof(hdr), "< %s >", menuItems[MENU_PAGE_MODE][activeItem]);
+  else
+    snprintf(hdr, sizeof(hdr), "< %s >", menuTitle[menuPage]);
   header(hdr, "");
 
   if (menuPage == MENU_PAGE_PENGATURAN)
@@ -287,14 +292,14 @@ static void drawMenu()
     display.setCursor(0, 50);
     display.print("UP/DN:pilih  L/R:ubah");   // 21 char
     display.setCursor(0, 57);
-    display.print("L1/R1:mode  O:keluar");    // 20 char
+    display.print("START:mulai O:batal");     // 19 char
   }
   else
   {
     display.setCursor(0, 50);
     display.print("UP/DOWN:pilih mode");      // 18 char
     display.setCursor(0, 57);
-    display.print("START:OK  O:batal");       // 17 char
+    display.print("START:atur  O:batal");     // 19 char
   }
 }
 

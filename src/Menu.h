@@ -20,7 +20,9 @@ void startDefaultMode();
 
 // ------------------------------------------------------------
 //  PENGATURAN LIVE — satu baris = satu nilai yang bisa diubah dari stik
-//  di halaman PENGATURAN (tombol KIRI/KANAN mengubah item yang disorot).
+//  di layar PENGATURAN (tombol KIRI/KANAN mengubah item yang disorot).
+//  Layar ini muncul OTOMATIS setelah pilih Soccer/Sumo di MODE MAIN,
+//  sebelum benar-benar masuk RUN — lihat handleMenu() di Controls.cpp.
 // ------------------------------------------------------------
 struct SettingItem
 {
@@ -28,10 +30,12 @@ struct SettingItem
   int        *val;   // pointer LANGSUNG ke variabel g_* asli — lihat
                       // catatan panjang soal ini di Menu.cpp
   int lo, hi, step;
-  const char *unit;   // contoh: "%" ; kosongkan "" kalau tidak perlu satuan
+  const char *unit;    // contoh: "%" ; kosongkan "" kalau tidak perlu satuan
+  bool persist;        // true = simpan ke flash, bertahan lintas restart.
+                        // false = cuma berlaku sesi ini (lihat Config.h).
 };
 
-#define SETTINGS_COUNT 1
+#define SETTINGS_COUNT 2
 extern SettingItem settingsList[SETTINGS_COUNT];
 
 void settingsLoad();   // baca nilai tersimpan dari flash (NVS) — panggil di setup()

@@ -14,12 +14,11 @@
 //    R2/R1/L2/L1     : gas bertahap  SEGITIGA       : tendang
 //    X     : mundur -> maju          KOTAK : mundur -> putar KANAN
 //    BULAT : mundur -> putar KIRI    SELECT: buka/tutup menu
-//  Navigasi menu:
-//    L1/R1      : pindah halaman (MODE MAIN <-> PENGATURAN)
-//    UP/DOWN    : pilih baris di halaman aktif
-//    LEFT/RIGHT : di halaman PENGATURAN -> ubah nilai baris terpilih
-//    START      : (halaman MODE MAIN) konfirmasi pilih mode
-//    BULAT      : batal / keluar menu
+//  Navigasi menu (2 langkah setelah SELECT):
+//    1) MODE MAIN  : UP/DOWN pilih Soccer/Sumo, START lanjut ke langkah 2
+//    2) PENGATURAN : UP/DOWN pilih baris, LEFT/RIGHT ubah nilainya,
+//                    START konfirmasi & mulai RUN, BULAT batal (balik ke 1)
+//    BULAT di langkah 1 : keluar menu sepenuhnya
 // ============================================================
 
 // --- State sebelumnya untuk deteksi "1 tekan = 1 aksi" ---
@@ -141,7 +140,14 @@ static void driveManual()
 }
 
 // ------------------------------------------------------------
-//  Navigasi menu
+//  Navigasi menu — alurnya 2 langkah:
+//    1) MODE MAIN     : pilih Soccer/Sumo, START -> lanjut ke langkah 2
+//    2) PENGATURAN    : atur Max Speed & Kehalusan UNTUK MODE YANG BARU
+//                        DIPILIH, START -> baru benar-benar masuk RUN
+//                        (O/BULAT di sini balik ke daftar mode, batal)
+//  Preset mode (applyModePreset) dipasang begitu masuk langkah 2, supaya
+//  nilai yang tampil di layar pengaturan adalah nilai default mode itu,
+//  siap ditimpa manual sebelum dikonfirmasi.
 // ------------------------------------------------------------
 static void handleMenu(bool eL1, bool eR1, bool eUp, bool eDown,
                        bool eLeft, bool eRight, bool eCircle, bool eStart)
@@ -149,33 +155,43 @@ static void handleMenu(bool eL1, bool eR1, bool eUp, bool eDown,
   // Ramp motor ke 0 hanya kalau belum berhenti (hemat CPU & GPIO setiap tick)
   if (curLeft != 0 || curRight != 0) stopMotorsSmooth();
 
-  // L1/R1: pindah antar halaman menu (MODE MAIN <-> PENGATURAN)
-  if (eL1) { menuPage = (menuPage + MENU_COUNT - 1) % MENU_COUNT; menuItem = 0; oledDirty = true; }
-  if (eR1) { menuPage = (menuPage + 1) % MENU_COUNT;              menuItem = 0; oledDirty = true; }
-
-  if (eUp)   { menuItem = (menuItem + menuLen[menuPage] - 1) % menuLen[menuPage]; oledDirty = true; }
-  if (eDown) { menuItem = (menuItem + 1) % menuLen[menuPage];                     oledDirty = true; }
-
-  if (eCircle) { sysState = hasActiveMode ? ST_RUN : ST_IDLE; oledDirty = true; } // batal
-
   if (menuPage == MENU_PAGE_PENGATURAN)
   {
+    // --- Langkah 2: layar pengaturan mode yang baru dipilih ---
+    if (eUp)   { menuItem = (menuItem + SETTINGS_COUNT - 1) % SETTINGS_COUNT; oledDirty = true; }
+    if (eDown) { menuItem = (menuItem + 1) % SETTINGS_COUNT;                  oledDirty = true; }
+
     // KIRI/KANAN ubah nilai baris yang sedang disorot. Berlaku detik itu
-    // juga (baca catatan panjangnya di Menu.cpp) dan langsung disimpan ke
-    // flash supaya tidak hilang walau ESP32 restart.
+    // juga (baca catatan panjangnya di Menu.cpp). Cuma item yang ditandai
+    // persist=true yang ditulis ke flash (lihat Menu.cpp/Config.h).
     SettingItem &s = settingsList[menuItem];
-    if (eLeft)  { *s.val = max(s.lo, *s.val - s.step); settingsSave(); oledDirty = true; }
-    if (eRight) { *s.val = min(s.hi, *s.val + s.step); settingsSave(); oledDirty = true; }
+    if (eLeft)  { *s.val = max(s.lo, *s.val - s.step); if (s.persist) settingsSave(); oledDirty = true; }
+    if (eRight) { *s.val = min(s.hi, *s.val + s.step); if (s.persist) settingsSave(); oledDirty = true; }
+
+    if (eCircle) { menuPage = MENU_PAGE_MODE; menuItem = activeItem; oledDirty = true; }  // batal -> balik pilih mode
+    if (eStart)  { sysState = ST_RUN; oledDirty = true; }                                 // konfirmasi -> jalan
   }
-  else if (eStart)  // halaman MODE MAIN: konfirmasi pilih mode
+  else
   {
-    // Pilih MODE -> masuk RUN
-    activeMenu = menuPage;
-    activeItem = menuItem;
-    hasActiveMode = true;
-    applyModePreset();
-    sysState = ST_RUN;
-    oledDirty = true;
+    // --- Langkah 1: daftar mode (Soccer/Sumo) ---
+    if (eUp)   { menuItem = (menuItem + menuLen[MENU_PAGE_MODE] - 1) % menuLen[MENU_PAGE_MODE]; oledDirty = true; }
+    if (eDown) { menuItem = (menuItem + 1) % menuLen[MENU_PAGE_MODE];                            oledDirty = true; }
+
+    if (eCircle) { sysState = hasActiveMode ? ST_RUN : ST_IDLE; oledDirty = true; } // batal, keluar menu total
+
+    if (eStart)
+    {
+      activeMenu = MENU_PAGE_MODE;
+      activeItem = menuItem;
+      hasActiveMode = true;
+      applyModePreset();          // set rampStep/kickArmed default mode ini
+      settingsLoad();             // ambil Max Speed & Steering MILIK MODE INI dari flash
+                                   // (terpisah per mode -> Sumo tidak numpang punya Soccer)
+      menuPage = MENU_PAGE_PENGATURAN;
+      menuItem = 0;
+      oledDirty = true;
+      // sysState TETAP ST_MENU -> lanjut ke layar pengaturan, belum RUN
+    }
   }
 }
 
