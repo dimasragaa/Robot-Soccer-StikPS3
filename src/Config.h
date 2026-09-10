@@ -130,7 +130,9 @@
 // ------------------------------------------------------------
 #define DEADBAND     12   // ambang stik dianggap netral
 #define CONTROL_MS   2    // periode baca kontrol (2ms = tangkap tiap paket BT ~8ms)
-#define OLED_MS      120  // periode refresh OLED
+#define OLED_MS      120  // jarak MINIMAL antar gambar ulang OLED
+#define OLED_FORCE_MS 1000 // gambar ulang berkala walau isinya tidak berubah
+                            // (jaring pengaman kalau layar sempat glitch)
 #define PRINT_MS     200  // periode cetak serial
 
 // ------------------------------------------------------------

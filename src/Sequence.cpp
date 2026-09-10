@@ -71,11 +71,21 @@ void runSequence()
     setMotorR(curRight);
 
     if (elapsed >= durFase2) {
+      // Dulu di sini nilai motor dipotong langsung dari penuh ke nol.
+      // Itu sentakan mekanis yang tidak perlu, jadi sekarang masuk fase
+      // REM: turun bertahap dulu sampai benar-benar diam, baru selesai.
+      seqState = SEQ_REM;
+      Serial.println("[SEQ] Fase 2 selesai -> mengerem halus...");
+      oledDirty = true;
+    }
+  }
+  else if (seqState == SEQ_REM)
+  {
+    stopMotorsSmooth();   // turunkan bertahap; berhenti sendiri saat 0
+
+    if (curLeft == 0 && curRight == 0) {
       seqState = SEQ_IDLE;   // selesai
       seqType  = SQ_NONE;
-      curLeft = curRight = 0;
-      setMotorL(0);
-      setMotorR(0);
       Serial.println("[SEQ] Selesai! Kembali ke kontrol manual.");
       oledDirty = true;
     }

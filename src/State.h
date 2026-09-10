@@ -15,8 +15,10 @@ enum SysState { ST_IDLE, ST_MENU, ST_RUN };
 // --- Jenis auto-sequence ---
 enum SeqType  { SQ_NONE, SQ_MUNDUR_MAJU, SQ_MUNDUR_KANAN, SQ_MUNDUR_KIRI };
 
-// --- Fase sequence: FASE1 = mundur, FASE2 = maju/putar ---
-enum SeqPhase { SEQ_IDLE, SEQ_FASE1, SEQ_FASE2 };
+// --- Fase sequence: FASE1 = mundur, FASE2 = maju/putar, REM = turun halus ---
+//  SEQ_REM ditambahkan supaya sequence tidak berakhir dengan memotong
+//  tenaga mendadak dari nilai penuh ke nol (bikin sentakan mekanis).
+enum SeqPhase { SEQ_IDLE, SEQ_FASE1, SEQ_FASE2, SEQ_REM };
 
 // --- Parameter jalan (live, bisa berubah lewat menu Pengaturan) ---
 extern int  g_maxSpeed;
@@ -32,6 +34,7 @@ extern int  g_spdR2;   // R2 ditahan  -> "KENCANG BANGET"
 extern int  g_spdR1;   // R1 ditahan  -> "KENCANG"
 extern int  g_spdL1;   // L1 ditahan  -> "PELAN"
 extern int  g_spdL2;   // L2 ditahan  -> "PELAN BANGET" (creep)
+extern int  g_spdNorm; // tidak ada trigger ditahan -> "--"
 
 // --- Status sistem & koneksi ---
 extern SysState sysState;

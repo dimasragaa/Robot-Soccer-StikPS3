@@ -31,14 +31,21 @@ struct SettingItem
                       // (mis. "spdR2" -> "spdR20"/"spdR21"). Maks 13 huruf,
                       // karena kunci NVS dibatasi 15 karakter.
   int        *val;   // pointer LANGSUNG ke variabel g_* asli — lihat
-                      // catatan panjang soal ini di Menu.cpp
+                      // catatan panjang soal ini di Menu.cpp.
+                      // nullptr = baris AKSI (mis. Reset), bukan nilai.
   int lo, hi, step;
   const char *unit;    // contoh: "%" ; kosongkan "" kalau tidak perlu satuan
   bool persist;        // true = simpan ke flash, bertahan lintas restart
 };
 
-#define SETTINGS_COUNT 6
+#define SETTINGS_COUNT 8
 extern SettingItem settingsList[SETTINGS_COUNT];
 
-void settingsLoad();   // baca nilai tersimpan dari flash (NVS) — panggil di setup()
-void settingsSave();   // simpan nilai sekarang ke flash — panggil tiap ada perubahan
+void settingsLoad();    // baca nilai tersimpan dari flash (NVS)
+void settingsSave();    // simpan nilai sekarang ke flash
+void settingsReset();   // kembalikan mode ini ke nilai pabrik, lalu simpan
+
+// Mode terakhir yang dipakai ikut disimpan, supaya restart (termasuk
+// restart otomatis saat stik putus) tidak diam-diam balik ke Soccer.
+uint8_t modeLoad();
+void    modeSave();

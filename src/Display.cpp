@@ -212,6 +212,7 @@ static void drawRun()
                                         "PUTAR KIRI";
     display.print(label);
   }
+  else if (seqState == SEQ_REM) display.print("REM");
   else
   {
     // Tampilkan arah gerak sekarang (gabungan maju/mundur + kanan/kiri),
@@ -284,7 +285,10 @@ static void drawMenu()
     {
       uint8_t i = first + r;
       char val[10];
-      snprintf(val, sizeof(val), "%d%s", *settingsList[i].val, settingsList[i].unit);
+      if (settingsList[i].val)
+        snprintf(val, sizeof(val), "%d%s", *settingsList[i].val, settingsList[i].unit);
+      else
+        snprintf(val, sizeof(val), "Tekan >");   // baris aksi (Reset)
       menuRow(r, menuItem - first, settingsList[i].label, val);
     }
   }
@@ -388,17 +392,62 @@ static void drawOLED()
 //  Sebagian besar waktu task ini tidur (vTaskDelay), jadi bebannya
 //  ke CPU nyaris nol saat tidak menggambar.
 // ============================================================
+// Sidik jari isi layar: satu angka yang ikut berubah kalau ADA SATU SAJA
+// hal yang tampil berubah. Dipakai supaya layar tidak digambar ulang
+// terus-menerus padahal isinya sama persis — menggambar berarti mengirim
+// 1 KB lewat I2C, jadi saat robot diam ini menghemat banyak sekali.
+static inline uint32_t mix(uint32_t h, uint32_t v) { h ^= v; return h * 16777619u; }
+
+static uint32_t screenSignature()
+{
+  uint32_t h = 2166136261u;
+  h = mix(h, (uint32_t)sysState);
+  h = mix(h, ps3Linked() ? 1u : 0u);
+  h = mix(h, (uint32_t)(curLeft  + 512));
+  h = mix(h, (uint32_t)(curRight + 512));
+  h = mix(h, (uint32_t)seqState);
+  h = mix(h, (uint32_t)seqType);
+  h = mix(h, (uint32_t)(kickArmed ? 1 : 0) | (g_invert ? 2u : 0u));
+  h = mix(h, (uint32_t)menuPage);
+  h = mix(h, (uint32_t)menuItem);
+  h = mix(h, (uint32_t)activeItem);
+  h = mix(h, (uint32_t)(Ps3.data.button.r2 ? 1 : 0) |
+             (Ps3.data.button.r1 ? 2u : 0u) |
+             (Ps3.data.button.l2 ? 4u : 0u) |
+             (Ps3.data.button.l1 ? 8u : 0u));
+
+  // Nilai setelan hanya tampil di layar PENGATURAN, jadi cukup dihitung
+  // saat layar itu terbuka.
+  if (sysState == ST_MENU && menuPage == MENU_PAGE_PENGATURAN)
+    for (uint8_t i = 0; i < SETTINGS_COUNT; i++)
+      if (settingsList[i].val) h = mix(h, (uint32_t)*settingsList[i].val);
+
+  return h;
+}
+
 static void oledTask(void *)
 {
+  uint32_t lastSig = 0;
+  bool     first   = true;
+
   for (;;)
   {
-    // Refresh lebih cepat saat sequence aktif (animasi progress bar)
-    uint32_t period = (sysState == ST_RUN && seqState != SEQ_IDLE)
-                          ? 60
-                          : OLED_MS;
     unsigned long now = millis();
-    if (oledDirty || (now - lastOled >= period))
+
+    // Batas kecepatan gambar: walau isinya berubah tiap 2 ms saat robot
+    // jalan, layar tetap digambar paling cepat segini. Saat sequence
+    // aktif dipercepat, supaya batang motor tetap terlihat mengalir.
+    uint32_t minGap = (sysState == ST_RUN && seqState != SEQ_IDLE) ? 60 : OLED_MS;
+
+    uint32_t sig     = screenSignature();
+    bool     changed = first || oledDirty || (sig != lastSig);
+    bool     due     = (now - lastOled >= minGap);
+    bool     forced  = (now - lastOled >= OLED_FORCE_MS);  // penyegaran berkala
+
+    if ((changed && due) || forced)
     {
+      first     = false;
+      lastSig   = sig;
       lastOled  = now;
       oledDirty = false;
       drawOLED();

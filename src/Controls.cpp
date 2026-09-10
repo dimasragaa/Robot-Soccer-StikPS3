@@ -22,8 +22,10 @@
 // ============================================================
 
 // --- State sebelumnya untuk deteksi "1 tekan = 1 aksi" ---
-// (UP/DOWN/KIRI/KANAN tidak ada di sini — keempatnya pakai Repeater di bawah)
-static bool pSelect=0, pStart=0, pL1=0, pR1=0;
+// (UP/DOWN/KIRI/KANAN tidak ada di sini — keempatnya pakai Repeater di bawah.
+//  L1/R1 juga tidak: di mode RUN keduanya dibaca langsung sebagai tombol
+//  ditahan, dan di menu sudah tidak dipakai sejak alurnya jadi 2 langkah.)
+static bool pSelect=0, pStart=0;
 static bool pCircle=0, pCross=0, pSquare=0;
 
 static bool edge(bool now, bool &prev){ bool e = now && !prev; prev = now; return e; }
@@ -60,6 +62,21 @@ static bool repeatFire(bool now, Repeater &r)
 
 static Repeater rLeft, rRight, rUp, rDown;
 
+// --- Setelan yang sudah diubah tapi belum ditulis ke flash ---
+//  Sengaja di lingkup file, bukan di dalam handleMenu(), supaya jalur
+//  keluar yang TIDAK lewat handleMenu() juga bisa menyimpannya:
+//  tombol SELECT dan stik putus keduanya menutup menu dari luar. Kalau
+//  flag ini terkurung di dalam handleMenu(), menekan SELECT sambil masih
+//  menahan KIRI/KANAN akan membuat perubahan terakhir hilang saat restart.
+static bool settingsDirty = false;
+
+static void settingsFlush()
+{
+  if (!settingsDirty) return;
+  settingsSave();
+  settingsDirty = false;
+}
+
 // ------------------------------------------------------------
 //  STATUS KONEKSI STIK YANG BISA DIPERCAYA
 //
@@ -85,9 +102,11 @@ bool ps3Linked()
 //  Fungsi ini dipakai untuk Serial Monitor & tampilan saja.
 // ------------------------------------------------------------
 int triggerSpeed(){
-  // g_spd* = variabel live yang bisa diatur dari menu PENGATURAN.
-  // SPD_DEFAULT (tanpa trigger) masih konstanta, tidak diatur dari menu.
-  int kec = g_maxSpeed * SPD_DEFAULT / 100;
+  // Semua g_spd* di bawah bisa diatur dari menu PENGATURAN, termasuk
+  // g_spdNorm (saat tidak ada trigger ditahan). Dulu yang terakhir itu
+  // konstanta 50% — akibatnya kalau L1 disetel di atas 50, tombol
+  // "pelan" justru lebih cepat daripada tidak menekan apa-apa.
+  int kec = g_maxSpeed * g_spdNorm / 100;
   if      (Ps3.data.button.r2) kec = g_maxSpeed * g_spdR2 / 100;
   else if (Ps3.data.button.r1) kec = g_maxSpeed * g_spdR1 / 100;
   else if (Ps3.data.button.l2) kec = g_maxSpeed * g_spdL2 / 100;
@@ -102,10 +121,16 @@ int triggerSpeed(){
 static int shapeInput(int raw)
 {
   int a = abs(raw);
+
+  // Stik memberi -128..+127, jadi sisi negatif punya 1 langkah lebih
+  // banyak. Kalau dibiarkan, satu arah dapat 100% sementara arah
+  // sebaliknya cuma ~99% — maju & mundur tidak sama kuat. Dipangkas
+  // ke 127 supaya kedua arah benar-benar simetris.
+  if (a > 127) a = 127;
   if (a < DEADBAND) return 0;
 
   // [B] Re-normalisasi: mulai dari 0 tepat di tepi deadband (tanpa loncat)
-  int mag = (a - DEADBAND) * 1000 / (128 - DEADBAND);   // 0..1000
+  int mag = (a - DEADBAND) * 1000 / (127 - DEADBAND);   // 0..1000
   if (mag > 1000) mag = 1000;
 
   // [C] Expo: campur linear & kubik -> tengah landai, ujung tetap penuh
@@ -180,18 +205,13 @@ static void driveManual()
 //    2) PENGATURAN    : atur Max Speed & Kehalusan UNTUK MODE YANG BARU
 //                        DIPILIH, START -> baru benar-benar masuk RUN
 //                        (O/BULAT di sini balik ke daftar mode, batal)
-//  Preset mode (applyModePreset) dipasang begitu masuk langkah 2, supaya
-//  nilai yang tampil di layar pengaturan adalah nilai default mode itu,
-//  siap ditimpa manual sebelum dikonfirmasi.
+//  Preset mode (applyModePreset) dipasang begitu masuk langkah 2, lalu
+//  settingsLoad() menimpanya dengan setelan simpanan milik mode itu.
 // ------------------------------------------------------------
-static void handleMenu(bool eL1, bool eR1, bool eUp, bool eDown,
+static void handleMenu(bool eUp, bool eDown,
                        bool eLeft, bool eRight, bool eCircle, bool eStart)
 {
-  // Ramp motor ke 0 hanya kalau belum berhenti (hemat CPU & GPIO setiap tick)
-  if (curLeft != 0 || curRight != 0) stopMotorsSmooth();
-
-  // Ada perubahan setelan yang belum ditulis ke flash?
-  static bool dirty = false;
+  stopMotorsSmooth();   // penjaga "sudah diam" ada di dalam fungsinya
 
   if (menuPage == MENU_PAGE_PENGATURAN)
   {
@@ -199,28 +219,32 @@ static void handleMenu(bool eL1, bool eR1, bool eUp, bool eDown,
     if (eUp)   { menuItem = (menuItem + SETTINGS_COUNT - 1) % SETTINGS_COUNT; oledDirty = true; }
     if (eDown) { menuItem = (menuItem + 1) % SETTINGS_COUNT;                  oledDirty = true; }
 
-    // KIRI/KANAN ubah nilai baris yang sedang disorot. Berlaku detik itu
-    // juga (baca catatan panjangnya di Menu.cpp). Tombol ini auto-repeat,
-    // jadi ditahan = nilainya jalan terus.
     SettingItem &s = settingsList[menuItem];
-    if (eLeft)  { *s.val = max(s.lo, *s.val - s.step); dirty = true; oledDirty = true; }
-    if (eRight) { *s.val = min(s.hi, *s.val + s.step); dirty = true; oledDirty = true; }
+
+    if (!s.val)
+    {
+      // Baris AKSI (Reset). Tidak punya nilai, jadi KIRI/KANAN = jalankan.
+      // Sengaja tidak auto-repeat berulang: settingsReset() menulis nilai
+      // yang sama terus, jadi menahan tombol pun hasilnya tetap sama.
+      if (eLeft || eRight) { settingsReset(); oledDirty = true; }
+    }
+    else
+    {
+      // KIRI/KANAN ubah nilai baris yang sedang disorot. Berlaku detik itu
+      // juga (baca catatan panjangnya di Menu.cpp). Tombol ini auto-repeat,
+      // jadi ditahan = nilainya jalan terus.
+      if (eLeft)  { *s.val = max(s.lo, *s.val - s.step); settingsDirty = true; oledDirty = true; }
+      if (eRight) { *s.val = min(s.hi, *s.val + s.step); settingsDirty = true; oledDirty = true; }
+    }
 
     // Menulis ke flash SEKALI setelah tombol dilepas, bukan tiap langkah.
     // Kalau ditulis tiap langkah, menahan tombol beberapa detik akan
     // menghasilkan puluhan penulisan flash — boros umur flash dan tiap
     // penulisan makan waktu, jadi nilainya terasa tersendat saat digeser.
-    if (dirty && !Ps3.data.button.left && !Ps3.data.button.right) {
-      settingsSave();
-      dirty = false;
-    }
+    if (!Ps3.data.button.left && !Ps3.data.button.right) settingsFlush();
 
-    // Batal / konfirmasi: pastikan perubahan yang belum sempat ditulis
-    // (mis. START ditekan sementara KIRI/KANAN masih ditahan) tetap tersimpan.
-    if (eCircle) { if (dirty) { settingsSave(); dirty = false; }
-                   menuPage = MENU_PAGE_MODE; menuItem = activeItem; oledDirty = true; }
-    if (eStart)  { if (dirty) { settingsSave(); dirty = false; }
-                   sysState = ST_RUN; oledDirty = true; }
+    if (eCircle) { settingsFlush(); menuPage = MENU_PAGE_MODE; menuItem = activeItem; oledDirty = true; }
+    if (eStart)  { settingsFlush(); sysState = ST_RUN;                                oledDirty = true; }
   }
   else
   {
@@ -235,9 +259,9 @@ static void handleMenu(bool eL1, bool eR1, bool eUp, bool eDown,
       activeMenu = MENU_PAGE_MODE;
       activeItem = menuItem;
       hasActiveMode = true;
-      applyModePreset();          // set rampStep/kickArmed default mode ini
-      settingsLoad();             // ambil Max Speed & Steering MILIK MODE INI dari flash
-                                   // (terpisah per mode -> Sumo tidak numpang punya Soccer)
+      applyModePreset();          // pasang nilai pabrik mode ini
+      settingsLoad();             // lalu timpa dengan setelan MILIK MODE INI dari flash
+      modeSave();                 // ingat mode ini untuk restart berikutnya
       menuPage = MENU_PAGE_PENGATURAN;
       menuItem = 0;
       oledDirty = true;
@@ -270,7 +294,10 @@ void controlsUpdate()
   if (nowConnected && !wasConnected) startDefaultMode();
   wasConnected = nowConnected;
 
-  if (!nowConnected) { stopMotorsSmooth(); return; } // fail-safe saat putus
+  // Fail-safe saat putus. settingsFlush() dulu: kalau stik mati sewaktu
+  // kamu sedang mengatur, perubahannya tetap tersimpan — apalagi robot
+  // akan restart sendiri beberapa saat lagi (linkWatchdog di main.cpp).
+  if (!nowConnected) { settingsFlush(); stopMotorsSmooth(); return; }
 
   // Baca edge semua tombol navigasi
   bool eSelect = edge(Ps3.data.button.select, pSelect);
@@ -282,20 +309,28 @@ void controlsUpdate()
   // KIRI/KANAN pakai auto-repeat: ditahan = nilainya jalan terus
   bool eLeft   = repeatFire(Ps3.data.button.left,  rLeft);
   bool eRight  = repeatFire(Ps3.data.button.right, rRight);
-  bool eL1     = edge(Ps3.data.button.l1,     pL1);
-  bool eR1     = edge(Ps3.data.button.r1,     pR1);
   bool eCircle = edge(Ps3.data.button.circle, pCircle);
   bool eCross  = edge(Ps3.data.button.cross,  pCross);
   bool eSquare = edge(Ps3.data.button.square, pSquare);
 
   // SELECT: buka/tutup menu dari mana saja
   if (eSelect) {
-    if (sysState == ST_MENU) sysState = hasActiveMode ? ST_RUN : ST_IDLE;
-    else { sysState = ST_MENU; menuPage = 0; menuItem = 0; }
+    if (sysState == ST_MENU) {
+      settingsFlush();   // simpan dulu; handleMenu() tidak jalan tick ini
+      sysState = hasActiveMode ? ST_RUN : ST_IDLE;
+    }
+    else {
+      // Masuk menu = batalkan gerakan otomatis yang sedang jalan.
+      // Tanpa ini statusnya cuma BEKU: begitu keluar menu, sisa fasenya
+      // langsung diloncati (waktunya sudah lewat) dan motor tersentak.
+      seqState = SEQ_IDLE;
+      seqType  = SQ_NONE;
+      sysState = ST_MENU; menuPage = 0; menuItem = 0;
+    }
     oledDirty = true;
   }
 
-  if      (sysState == ST_MENU) handleMenu(eL1, eR1, eUp, eDown, eLeft, eRight, eCircle, eStart);
+  if      (sysState == ST_MENU) handleMenu(eUp, eDown, eLeft, eRight, eCircle, eStart);
   else if (sysState == ST_RUN)  handleRun(eCross, eSquare, eCircle);
   else                          stopMotorsSmooth(); // ST_IDLE
 }

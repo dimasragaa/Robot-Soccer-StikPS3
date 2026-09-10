@@ -19,8 +19,6 @@ void motorSetup()
   stopMotorsSmooth();
 }
 
-int applyDeadband(int v, int t){ return (abs(v) < t) ? 0 : v; }
-
 int ramp(int cur, int tgt, int step){
   if (cur < tgt) return min(cur + step, tgt);
   if (cur > tgt) return max(cur - step, tgt);
@@ -53,6 +51,12 @@ void setMotorL(int spd){ setMotor(M1_D1, M1_D2, M1_CH, spd); }  // Motor 1
 void setMotorR(int spd){ setMotor(M2_D3, M2_D4, M2_CH, spd); }  // Motor 2
 
 void stopMotorsSmooth(){
+  // Sudah benar-benar diam -> tidak perlu apa-apa. Penjaga ini di dalam
+  // sini, bukan di tiap pemanggil, supaya semua jalur (stik putus, menu,
+  // mode diam) ikut terlindungi dan tidak ada yang kelewat. Tanpa ini
+  // motor terus diperintah "berhenti" tiap 2 ms padahal sudah berhenti.
+  if (curLeft == 0 && curRight == 0) return;
+
   curLeft  = ramp(curLeft,  0, g_rampStep);
   curRight = ramp(curRight, 0, g_rampStep);
   setMotorL(curLeft);

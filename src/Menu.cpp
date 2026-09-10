@@ -33,13 +33,20 @@ const char* menuItems[MENU_COUNT][4] = {
 //  cuma nilai awalnya SAJA yang diambil dari Config.h; setelah itu dia
 //  jadi variabel biasa yang bebas diubah kapan pun ESP32 menyala.
 // ============================================================
+//  Baris terakhir sengaja BUKAN nilai (val = nullptr) melainkan AKSI:
+//  tekan KIRI/KANAN di baris itu = kembalikan mode ini ke nilai pabrik.
+//  Ini penting karena setelan tersimpan di area flash yang TIDAK ikut
+//  terhapus saat program di-upload ulang — tanpa tombol reset, salah
+//  setel cuma bisa dibetulkan lewat hapus-flash manual.
 SettingItem settingsList[SETTINGS_COUNT] = {
-  { "Max Speed", "maxSpeed",  &g_maxSpeed,  SPEED_SET_MIN, SPEED_SET_MAX, SPEED_SET_STEP, "",  true },
-  { "Steering",  "steerGain", &g_steerGain, STEER_SET_MIN, STEER_SET_MAX, STEER_SET_STEP, "%", true },
-  { "R2 Boost",  "spdR2",     &g_spdR2,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true },
-  { "R1 Cepat",  "spdR1",     &g_spdR1,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true },
-  { "L1 Pelan",  "spdL1",     &g_spdL1,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true },
-  { "L2 Creep",  "spdL2",     &g_spdL2,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true },
+  { "Max Speed", "maxSpeed",  &g_maxSpeed,  SPEED_SET_MIN, SPEED_SET_MAX, SPEED_SET_STEP, "",  true  },
+  { "Steering",  "steerGain", &g_steerGain, STEER_SET_MIN, STEER_SET_MAX, STEER_SET_STEP, "%", true  },
+  { "Normal",    "spdNorm",   &g_spdNorm,   TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true  },
+  { "R2 Boost",  "spdR2",     &g_spdR2,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true  },
+  { "R1 Cepat",  "spdR1",     &g_spdR1,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true  },
+  { "L1 Pelan",  "spdL1",     &g_spdL1,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true  },
+  { "L2 Creep",  "spdL2",     &g_spdL2,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true  },
+  { "Reset",     "",          nullptr,      0,             0,             0,              "",  false },
 };
 
 // ============================================================
@@ -68,7 +75,7 @@ void settingsLoad()
   for (uint8_t i = 0; i < SETTINGS_COUNT; i++)
   {
     SettingItem &s = settingsList[i];
-    if (!s.persist) continue;
+    if (!s.persist || !s.val) continue;   // lewati baris aksi (Reset)
 
     char k[16];
     snprintf(k, sizeof(k), "%s%u", s.key, activeItem);
@@ -84,12 +91,48 @@ void settingsSave()
   for (uint8_t i = 0; i < SETTINGS_COUNT; i++)
   {
     SettingItem &s = settingsList[i];
-    if (!s.persist) continue;
+    if (!s.persist || !s.val) continue;   // lewati baris aksi (Reset)
 
     char k[16];
     snprintf(k, sizeof(k), "%s%u", s.key, activeItem);
     prefs.putInt(k, *s.val);
   }
+  prefs.end();
+}
+
+// Kembalikan SEMUA setelan mode yang sedang aktif ke nilai pabrik, lalu
+// tulis ke flash supaya reset-nya ikut bertahan setelah restart.
+// Sengaja hanya mode yang aktif, bukan semuanya — supaya reset di Sumo
+// tidak ikut menghapus setelan Soccer yang mungkin sudah pas.
+void settingsReset()
+{
+  applyModePreset();   // pasang ulang nilai pabrik mode ini
+  settingsSave();      // timpa simpanan lama dengan nilai pabrik itu
+  Serial.printf(">> Setelan mode %s dikembalikan ke pabrik\n",
+                menuItems[MENU_PAGE_MODE][activeItem]);
+}
+
+// ------------------------------------------------------------
+//  MODE TERAKHIR
+//  Disimpan supaya restart tidak diam-diam mengembalikan robot ke
+//  Soccer. Ini penting karena robot sekarang restart SENDIRI tiap stik
+//  putus lama (linkWatchdog di main.cpp) — tanpa ini, satu kali stik
+//  mati di tengah pertandingan Sumo bisa membuat robot balik ke Soccer
+//  beserta seluruh setelan Soccer, tanpa kamu sadari.
+// ------------------------------------------------------------
+uint8_t modeLoad()
+{
+  prefs.begin("robot", true);
+  int m = prefs.getInt("lastMode", DEFAULT_ITEM);
+  prefs.end();
+  if (m < 0 || m >= (int)menuLen[MENU_PAGE_MODE]) m = DEFAULT_ITEM;
+  return (uint8_t)m;
+}
+
+void modeSave()
+{
+  prefs.begin("robot", false);
+  prefs.putInt("lastMode", (int)activeItem);
   prefs.end();
 }
 
@@ -107,6 +150,7 @@ void applyModePreset()
   // --- Sama untuk semua mode ---
   kickArmed  = false;
   g_maxSpeed = DEF_MAX_SPEED;
+  g_spdNorm  = SPD_DEFAULT;
   g_spdR2    = SPD_R2;
   g_spdR1    = SPD_R1;
   g_spdL1    = SPD_L1;
@@ -133,10 +177,10 @@ void applyModePreset()
 void startDefaultMode()
 {
   activeMenu = DEFAULT_MENU;
-  activeItem = DEFAULT_ITEM;
+  activeItem = modeLoad();   // lanjutkan mode terakhir, bukan selalu Soccer
   hasActiveMode = true;
   applyModePreset();
-  settingsLoad();   // Max Speed & Steering milik mode default ini (per-mode di flash)
+  settingsLoad();   // setelan milik mode itu (tersimpan terpisah per mode)
 
   seqState = SEQ_IDLE;
   seqType  = SQ_NONE;

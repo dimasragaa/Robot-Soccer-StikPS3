@@ -95,9 +95,10 @@ void setup()
   motorSetup();
   displaySetup();
 
-  // URUTAN WAJIB: preset dulu (nilai pabrik), baru settingsLoad() menimpa
-  // dengan setelan simpanan pengguna untuk mode ini. Kalau dibalik,
-  // preset akan menghapus setelan yang baru saja dibaca dari flash.
+  // URUTAN WAJIB: tentukan mode dulu, pasang nilai pabriknya, baru
+  // settingsLoad() menimpa dengan setelan simpanan untuk mode itu.
+  // Kalau dibalik, preset akan menghapus setelan yang baru saja dibaca.
+  activeItem = modeLoad();   // lanjutkan mode terakhir, bukan selalu Soccer
   applyModePreset();
   settingsLoad();
 
@@ -117,7 +118,13 @@ void loop()
 
   unsigned long now = millis();
   if (now - lastControl >= CONTROL_MS) {
-    lastControl = now;
+    // Maju SATU periode, bukan "lastControl = now". Bedanya: kalau tick
+    // sempat telat (task lain menyela), cara ini otomatis menyusul di
+    // putaran berikutnya, jadi rata-rata kontrol tetap 1x per CONTROL_MS.
+    // Kalau dipatok ke now, tiap keterlambatan hilang begitu saja dan
+    // ramp motor jadi ikut melambat — akselerasi terasa tidak konsisten.
+    lastControl += CONTROL_MS;
+    if (now - lastControl > CONTROL_MS * 4) lastControl = now;  // ketinggalan jauh: selaraskan
     controlsUpdate();   // semua logika tombol/stik/sequence
   }
 

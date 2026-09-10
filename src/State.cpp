@@ -9,10 +9,11 @@ int  g_steerGain = DEF_STEER_GAIN;
 int  g_rampStep  = DEF_RAMP_STEP;
 bool g_invert    = DEF_INVERT;
 
-int  g_spdR2 = SPD_R2;
-int  g_spdR1 = SPD_R1;
-int  g_spdL1 = SPD_L1;
-int  g_spdL2 = CREEP_SPEED_PCT;
+int  g_spdR2   = SPD_R2;
+int  g_spdR1   = SPD_R1;
+int  g_spdL1   = SPD_L1;
+int  g_spdL2   = CREEP_SPEED_PCT;
+int  g_spdNorm = SPD_DEFAULT;
 
 SysState sysState      = ST_RUN;   // langsung siap jalan begitu konek
 bool     hasActiveMode = true;

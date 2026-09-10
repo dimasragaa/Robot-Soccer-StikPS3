@@ -11,7 +11,6 @@
 void motorSetup();
 
 // Helper matematika
-int  applyDeadband(int v, int t);          // buang gerak kecil di sekitar 0
 int  ramp(int cur, int tgt, int step);     // ubah nilai bertahap (halus)
 
 // Kendali motor (spd: -255..255 ; >0 maju, <0 mundur, 0 rem)
