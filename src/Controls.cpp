@@ -22,13 +22,13 @@
 // ============================================================
 
 // --- State sebelumnya untuk deteksi "1 tekan = 1 aksi" ---
-// (KIRI/KANAN tidak ada di sini — keduanya pakai Repeater di bawah)
-static bool pSelect=0, pStart=0, pUp=0, pDown=0, pL1=0, pR1=0;
+// (UP/DOWN/KIRI/KANAN tidak ada di sini — keempatnya pakai Repeater di bawah)
+static bool pSelect=0, pStart=0, pL1=0, pR1=0;
 static bool pCircle=0, pCross=0, pSquare=0;
 
 static bool edge(bool now, bool &prev){ bool e = now && !prev; prev = now; return e; }
 
-// --- Tombol dengan AUTO-REPEAT (dipakai KIRI/KANAN di layar PENGATURAN) ---
+// --- Tombol dengan AUTO-REPEAT (dipakai UP/DOWN/KIRI/KANAN di menu) ---
 //  Sekali ketuk -> 1 langkah (sama seperti edge biasa).
 //  Ditahan      -> setelah REPEAT_DELAY_MS mulai jalan sendiri, awalnya
 //                   pelan (REPEAT_RATE_MS) lalu dipercepat sendiri
@@ -58,7 +58,7 @@ static bool repeatFire(bool now, Repeater &r)
   return true;
 }
 
-static Repeater rLeft, rRight;
+static Repeater rLeft, rRight, rUp, rDown;
 
 // ------------------------------------------------------------
 //  STATUS KONEKSI STIK YANG BISA DIPERCAYA
@@ -275,8 +275,10 @@ void controlsUpdate()
   // Baca edge semua tombol navigasi
   bool eSelect = edge(Ps3.data.button.select, pSelect);
   bool eStart  = edge(Ps3.data.button.start,  pStart);
-  bool eUp     = edge(Ps3.data.button.up,     pUp);
-  bool eDown   = edge(Ps3.data.button.down,   pDown);
+  // UP/DOWN pakai auto-repeat juga: ditahan = pindah baris terus,
+  // tidak perlu ketuk berkali-kali.
+  bool eUp     = repeatFire(Ps3.data.button.up,   rUp);
+  bool eDown   = repeatFire(Ps3.data.button.down, rDown);
   // KIRI/KANAN pakai auto-repeat: ditahan = nilainya jalan terus
   bool eLeft   = repeatFire(Ps3.data.button.left,  rLeft);
   bool eRight  = repeatFire(Ps3.data.button.right, rRight);
