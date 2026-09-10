@@ -8,6 +8,7 @@
 #include <Adafruit_GFX.h>
 #include "State.h"
 #include "Menu.h"
+#include "Controls.h"   // ps3Linked()
 
 // ---- Pilih library sesuai chip driver di Config.h ----
 #if OLED_DRIVER == 2
@@ -294,7 +295,7 @@ static void drawIdle()
 // ============================================================
 static void drawOLED()
 {
-  bool disconnected = !Ps3.isConnected();
+  bool disconnected = !ps3Linked();   // JANGAN Ps3.isConnected(), lihat Controls.cpp
 
   // Layar putih + tulisan hitam saat PS3 terputus (kebalikan dari biasanya).
   // Cukup 1 perintah hardware, bukan gambar ulang tiap elemen dengan warna

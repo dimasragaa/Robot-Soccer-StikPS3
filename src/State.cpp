@@ -13,6 +13,8 @@ SysState sysState      = ST_RUN;   // langsung siap jalan begitu konek
 bool     hasActiveMode = true;
 bool     wasConnected  = false;
 
+volatile unsigned long lastPs3Packet = 0;   // 0 = belum pernah ada paket
+
 uint8_t menuPage = 0, menuItem = 0;
 uint8_t activeMenu = DEFAULT_MENU, activeItem = DEFAULT_ITEM;
 

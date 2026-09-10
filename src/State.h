@@ -29,6 +29,11 @@ extern SysState sysState;
 extern bool hasActiveMode;
 extern bool wasConnected;
 
+// Waktu (millis) paket terakhir yang masuk dari stik PS3.
+// Ditulis dari callback paket (task Bluetooth), dibaca dari task lain,
+// makanya volatile. Dipakai oleh ps3Linked() di Controls.cpp.
+extern volatile unsigned long lastPs3Packet;
+
 // --- Indeks menu ---
 extern uint8_t menuPage, menuItem;      // yang sedang di-navigasi
 extern uint8_t activeMenu, activeItem;  // mode yang sedang aktif

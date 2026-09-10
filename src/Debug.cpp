@@ -8,7 +8,7 @@
 
 static void printSerial()
 {
-  if (!Ps3.isConnected()) { Serial.println("PS3: DISCONNECTED"); return; }
+  if (!ps3Linked()) { Serial.println("PS3: DISCONNECTED"); return; }
 
   const char* stName = (sysState==ST_IDLE) ? "IDLE" :
                        (sysState==ST_MENU) ? "MENU" : "RUN";

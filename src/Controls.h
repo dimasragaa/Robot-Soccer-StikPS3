@@ -16,3 +16,7 @@ void controlsUpdate();
 // Hitung kecepatan aktif dari trigger (R2/R1/L2/L1).
 // Dipakai bersama oleh kontrol manual & cetak serial.
 int triggerSpeed();
+
+// Status koneksi stik yang bisa dipercaya — PAKAI INI, jangan
+// Ps3.isConnected() (alasannya ada di Controls.cpp).
+bool ps3Linked();

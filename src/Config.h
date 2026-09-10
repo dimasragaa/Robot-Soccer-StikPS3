@@ -53,6 +53,24 @@
 #define PS3_MAC "5c:6d:21:55:e7:37"
 
 // ------------------------------------------------------------
+//  DETEKSI STIK PUTUS
+//  Library PS3 tidak pernah melapor "putus" — callback disconnect di
+//  dalamnya cuma mencetak log, flag-nya tidak pernah dimatikan. Jadi
+//  kita ukur sendiri: stik mengirim paket ~100x per detik walau diam,
+//  kalau paket berhenti selama ini berarti sudah tidak terhubung.
+//  Jangan terlalu kecil (BT sesekali telat); 1 detik sudah aman.
+// ------------------------------------------------------------
+#define PS3_TIMEOUT_MS  1000
+
+// Restart otomatis setelah stik terdeteksi putus, supaya sambungan
+// BERIKUTNYA cepat. Alasannya ada di linkWatchdog() di main.cpp.
+// Ini jeda tunggu setelah putus terdeteksi: kalau stik sempat pulih
+// sebelum waktu ini habis, restart dibatalkan.
+// Jangan terlalu pendek supaya gangguan sesaat tidak bikin restart.
+// Isi 0 kalau mau mematikan fitur restart otomatis ini.
+#define PS3_RESTART_MS  1200
+
+// ------------------------------------------------------------
 //  PARAMETER JALAN — NILAI AWAL (bisa diubah live lewat menu Pengaturan)
 // ------------------------------------------------------------
 #define DEF_MAX_SPEED   255   // ceiling kecepatan (0..255)

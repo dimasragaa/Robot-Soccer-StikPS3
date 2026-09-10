@@ -27,6 +27,25 @@ static bool pCircle=0, pCross=0, pSquare=0;
 static bool edge(bool now, bool &prev){ bool e = now && !prev; prev = now; return e; }
 
 // ------------------------------------------------------------
+//  STATUS KONEKSI STIK YANG BISA DIPERCAYA
+//
+//  JANGAN pakai Ps3.isConnected(): flag di dalam library hanya
+//  dinyalakan saat paket pertama masuk dan TIDAK PERNAH dimatikan —
+//  callback putus di ps3_l2cap.c isinya cuma cetak log. Akibatnya
+//  sekali stik konek, library selamanya bilang "masih terhubung"
+//  walau stik sudah dimatikan.
+//
+//  Jadi kita ukur sendiri: stik mengirim paket ~100x per detik walau
+//  didiamkan. Kalau paket berhenti lebih dari PS3_TIMEOUT_MS,
+//  berarti sudah benar-benar putus.
+// ------------------------------------------------------------
+bool ps3Linked()
+{
+  unsigned long t = lastPs3Packet;   // baca sekali (32-bit = atomik di ESP32)
+  return (t != 0) && (millis() - t < PS3_TIMEOUT_MS);
+}
+
+// ------------------------------------------------------------
 //  Kecepatan aktif dari trigger (persen di Config.h)
 //  Catatan: L2 (creep) tidak masuk sini karena juga butuh ramp khusus.
 //  Fungsi ini dipakai untuk Serial Monitor & tampilan saja.
@@ -166,7 +185,7 @@ static void handleRun(bool eCross, bool eSquare, bool eCircle)
 void controlsUpdate()
 {
   // Begitu stik konek: langsung masuk mode jalan, tanpa SELECT/START
-  bool nowConnected = Ps3.isConnected();
+  bool nowConnected = ps3Linked();
   if (nowConnected && !wasConnected) startDefaultMode();
   wasConnected = nowConnected;
 
