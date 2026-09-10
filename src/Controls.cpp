@@ -216,8 +216,11 @@ static void handleMenu(bool eUp, bool eDown,
   if (menuPage == MENU_PAGE_PENGATURAN)
   {
     // --- Langkah 2: layar pengaturan mode yang baru dipilih ---
-    if (eUp)   { menuItem = (menuItem + SETTINGS_COUNT - 1) % SETTINGS_COUNT; oledDirty = true; }
-    if (eDown) { menuItem = (menuItem + 1) % SETTINGS_COUNT;                  oledDirty = true; }
+    // Berhenti di ujung (bukan muter balik ke atas/bawah). Ini juga yang
+    // menutup celah crash kemarin: menuItem TIDAK PERNAH bisa lebih dari
+    // SETTINGS_COUNT-1, jadi settingsList[menuItem] selalu di dalam batas.
+    if (eUp   && menuItem > 0)                  { menuItem--; oledDirty = true; }
+    if (eDown && menuItem < SETTINGS_COUNT - 1) { menuItem++; oledDirty = true; }
 
     SettingItem &s = settingsList[menuItem];
 
@@ -248,9 +251,9 @@ static void handleMenu(bool eUp, bool eDown,
   }
   else
   {
-    // --- Langkah 1: daftar mode (Soccer/Sumo) ---
-    if (eUp)   { menuItem = (menuItem + menuLen[MENU_PAGE_MODE] - 1) % menuLen[MENU_PAGE_MODE]; oledDirty = true; }
-    if (eDown) { menuItem = (menuItem + 1) % menuLen[MENU_PAGE_MODE];                            oledDirty = true; }
+    // --- Langkah 1: daftar mode (Soccer/Sumo) --- juga berhenti di ujung
+    if (eUp   && menuItem > 0)                               { menuItem--; oledDirty = true; }
+    if (eDown && menuItem < menuLen[MENU_PAGE_MODE] - 1)      { menuItem++; oledDirty = true; }
 
     if (eCircle) { sysState = hasActiveMode ? ST_RUN : ST_IDLE; oledDirty = true; } // batal, keluar menu total
 

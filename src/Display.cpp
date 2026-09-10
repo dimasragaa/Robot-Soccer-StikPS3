@@ -450,7 +450,14 @@ static void oledTask(void *)
       lastSig   = sig;
       lastOled  = now;
       oledDirty = false;
+
+      // Ukur lama kirim ke OLED. Normalnya ~15-25 ms (I2C 400kHz, 1KB data).
+      // Kalau jauh lebih lama, itu tanda bus I2C sempat macet/tersendat —
+      // bukti nyata untuk diagnosa "disconnect mendadak", bukan dugaan.
+      unsigned long t0 = millis();
       drawOLED();
+      unsigned long dt = millis() - t0;
+      if (dt > 80) Serial.printf(">> OLED lambat: %lu ms (cek kabel/solderan I2C)\n", dt);
     }
     vTaskDelay(10 / portTICK_PERIOD_MS); // cek tiap 10 ms, sisanya tidur
   }
@@ -460,6 +467,18 @@ void displaySetup()
 {
   Wire.begin(OLED_SDA, OLED_SCL);
   Wire.setClock(400000);
+
+  // PENTING: tanpa ini, Wire di ESP32 bisa menunggu TANPA BATAS WAKTU kalau
+  // bus I2C macet (kabel/solderan OLED kurang pas, atau derau saat motor
+  // nyentak). Task OLED jadi mengunci penuh 1 inti CPU tanpa pernah balik
+  // ke scheduler -> watchdog bawaan ESP32 memicu RESET SELURUH CHIP.
+  // Dari sisi stik PS3, ini kelihatan persis seperti "putus mendadak",
+  // karena Bluetooth ikut mati sesaat lalu ESP32 boot ulang sendiri.
+  // Dengan batas waktu ini, kalau bus macet, satu kiriman ke OLED gagal
+  // (layar sempat kosong/aneh sesaat) tapi CPU tetap jalan normal dan
+  // stik tidak ikut terputus.
+  Wire.setTimeOut(50);   // milidetik
+
 #if OLED_DRIVER == 2
   oledOK = display.begin(OLED_ADDR, true); // SH1106: begin(addr, reset)
 #else

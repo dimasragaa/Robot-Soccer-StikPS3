@@ -186,7 +186,7 @@ void startDefaultMode()
   seqType  = SQ_NONE;
   curLeft = curRight = 0;
   setMotorL(0);
-  setMotorR(0);
+  setMotorR(0);  
 
   sysState = ST_RUN;
   oledDirty = true;

@@ -14,9 +14,21 @@ static void printSerial()
                        (sysState==ST_MENU) ? "MENU" : "RUN";
 
   if (sysState == ST_MENU) {
-    Serial.printf("[%s] menu=%s > %s | set: max=%d steer=%d%% ramp=%d inv=%s\n",
-      stName, menuTitle[menuPage], menuItems[menuPage][menuItem],
-      g_maxSpeed, g_steerGain, g_rampStep, g_invert ? "ON" : "OFF");
+    // PENTING: menuItems[][] cuma berisi 4 slot per halaman, dan itu
+    // hanya dipakai halaman MODE MAIN (Soccer/Sumo). Halaman PENGATURAN
+    // punya baris SENDIRI di settingsList[] (sekarang 8 baris) — kalau
+    // menuItems[menuPage][menuItem] tetap dipanggil apa adanya begitu
+    // menuItem >= 4, itu membaca alamat di luar array dan crash saat
+    // dicetak (persis backtrace strlen() yang barusan terjadi).
+    if (menuPage == MENU_PAGE_PENGATURAN) {
+      SettingItem &s = settingsList[menuItem];
+      Serial.printf("[%s] pengaturan %s > %s\n",
+        stName, menuItems[MENU_PAGE_MODE][activeItem], s.label);
+    } else {
+      Serial.printf("[%s] menu=%s > %s | set: max=%d steer=%d%% ramp=%d inv=%s\n",
+        stName, menuTitle[menuPage], menuItems[menuPage][menuItem],
+        g_maxSpeed, g_steerGain, g_rampStep, g_invert ? "ON" : "OFF");
+    }
   }
   else if (sysState == ST_RUN) {
     int kec = triggerSpeed();
