@@ -183,10 +183,10 @@ static void drawRun()
 
   // Trigger aktif
   const char *trigStr = "--";
-  if      (Ps3.data.button.r2) trigStr = "R2";
-  else if (Ps3.data.button.r1) trigStr = "R1";
-  else if (Ps3.data.button.l2) trigStr = "L2";
-  else if (Ps3.data.button.l1) trigStr = "L1";
+  if      (Ps3.data.button.r2) trigStr = "KENCANG BANGET";
+  else if (Ps3.data.button.r1) trigStr = "KENCANG";
+  else if (Ps3.data.button.l2) trigStr = "PELAN BANGET";
+  else if (Ps3.data.button.l1) trigStr = "PELAN";
 
   // --- Header ---
   header(modeName, trigStr);
@@ -210,9 +210,28 @@ static void drawRun()
                                         "PUTAR KIRI";
     display.print(label);
   }
-  else if (Ps3.data.button.l2) display.print("L2");
-  else if (kickArmed)          display.print("KICK");
-  else                         display.print("MANUAL");
+  else
+  {
+    // Tampilkan arah gerak sekarang (gabungan maju/mundur + kanan/kiri),
+    // berlaku terus (termasuk saat L2/creep) — tidak ada label lain.
+    int avg  = curLeft + curRight;   // >0 maju, <0 mundur
+    int diff = curLeft - curRight;   // >0 belok kanan, <0 belok kiri
+    const int TH = 15;               // ambang, supaya getaran kecil = DIAM
+
+    bool goingFwd  = avg  >  TH;
+    bool goingBack = avg  < -TH;
+    bool turnRight = diff >  TH;
+    bool turnLeft  = diff < -TH;
+
+    char buf[16] = "";
+    if      (goingFwd)  strcat(buf, "MAJU");
+    else if (goingBack) strcat(buf, "MUNDUR");
+
+    if (turnRight)      { if (buf[0]) strcat(buf, " "); strcat(buf, "KANAN"); }
+    else if (turnLeft)  { if (buf[0]) strcat(buf, " "); strcat(buf, "KIRI");  }
+
+    display.print(buf[0] ? buf : "DIAM");
+  }
 
   if (g_invert)
   {
