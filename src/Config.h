@@ -90,20 +90,40 @@
 //  Nilai yang diatur disimpan ke flash (NVS) juga, supaya tidak hilang
 //  walau ESP32 restart/mati (termasuk restart otomatis saat stik putus).
 // ------------------------------------------------------------
+//  Semua *_SET_STEP di bawah = 1 supaya bisa dipaskan sehalus mungkin.
+//  Untuk menggeser jauh, tahan tombolnya (auto-repeat, lihat di bawah).
 #define SPEED_SET_MIN   60    // batas bawah Max Speed yang boleh diatur
 #define SPEED_SET_MAX   255   // batas atas
-#define SPEED_SET_STEP  5     // besar loncatan tiap tekan KIRI/KANAN
+#define SPEED_SET_STEP  1     // besar loncatan tiap tekan KIRI/KANAN
 
 // Steering (sensitivitas belok, g_steerGain) — sama seperti Max Speed:
-// DISIMPAN permanen ke flash begitu diubah. Konsekuensinya: begitu kamu
-// atur manual, angka itu jadi milik pengguna dan dipakai di MODE APA PUN
-// (Soccer/Sumo tidak lagi otomatis pasang 100%/110% bawaan masing-masing
-// — lihat applyModePreset() di Menu.cpp). Kehalusan gerak (g_rampStep)
-// TIDAK diubah lewat menu ini, tetap beda per mode seperti semula
-// (Soccer=6, Sumo=10), karena itu bukan parameter belok.
+// DISIMPAN permanen ke flash begitu diubah, dan disimpan TERPISAH PER MODE
+// (lihat settingsLoad/settingsSave di Menu.cpp), jadi atur di Sumo tidak
+// mengubah Soccer. Mode yang belum pernah diatur manual tetap pakai nilai
+// pabriknya masing-masing (Soccer 100%, Sumo 110%).
+// Kehalusan gerak (g_rampStep) TIDAK diatur lewat menu, tetap beda per
+// mode seperti semula (Soccer=6, Sumo=10), karena itu bukan parameter belok.
 #define STEER_SET_MIN   50    // belok paling landai
 #define STEER_SET_MAX   200   // belok paling tajam
-#define STEER_SET_STEP  5
+#define STEER_SET_STEP  1
+
+// Batas pengaturan trigger R2/R1/L1/L2 (persen dari Max Speed).
+// Sama seperti Max Speed & Steering: disimpan per mode, jadi setelan
+// trigger di Sumo tidak menyentuh Soccer.
+#define TRIG_SET_MIN    0
+#define TRIG_SET_MAX    100
+#define TRIG_SET_STEP   1
+
+// --- AUTO-REPEAT tombol KIRI/KANAN di layar PENGATURAN ---
+// Sekali ketuk = 1 langkah. Ditahan = nilainya jalan terus sendiri.
+// Karena langkahnya cuma 1, menggeser jauh (mis. Max Speed 60 -> 255)
+// butuh banyak langkah. Makanya lajunya DIPERCEPAT sendiri kalau tombol
+// ditahan lama: pelan dulu biar gampang berhenti di angka yang pas,
+// lalu ngebut kalau memang mau menyeberang jauh.
+#define REPEAT_DELAY_MS 400   // ditahan selama ini dulu, baru mulai jalan
+#define REPEAT_RATE_MS  60    // laju awal saat mulai jalan sendiri
+#define REPEAT_ACCEL_MS 1000  // ditahan lebih lama dari ini -> pindah ke laju cepat
+#define REPEAT_FAST_MS  15    // laju cepat untuk menyeberang rentang panjang
 
 // ------------------------------------------------------------
 //  TIMING (milidetik)

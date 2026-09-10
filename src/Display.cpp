@@ -253,25 +253,39 @@ static void drawRun()
 // ============================================================
 static void drawMenu()
 {
-  char hdr[22];
+  char hdr[22], pos[8] = "";
   if (menuPage == MENU_PAGE_PENGATURAN)
+  {
     // Di layar pengaturan, judul pakai nama mode yang baru dipilih
     // (bukan "PENGATURAN" generik) supaya jelas ini setelan UNTUK mode itu.
     snprintf(hdr, sizeof(hdr), "< %s >", menuItems[MENU_PAGE_MODE][activeItem]);
+    // Penunjuk posisi di kanan header, mis. "3/6" — karena daftarnya
+    // lebih panjang dari layar, ini yang memberi tahu masih ada sisa.
+    snprintf(pos, sizeof(pos), "%u/%u", menuItem + 1, (unsigned)SETTINGS_COUNT);
+  }
   else
     snprintf(hdr, sizeof(hdr), "< %s >", menuTitle[menuPage]);
-  header(hdr, "");
+  header(hdr, pos);
 
   if (menuPage == MENU_PAGE_PENGATURAN)
   {
+    // Ruang antara header dan footer cuma muat 3 baris (y=12/24/36),
+    // sedangkan setelannya ada 6. Jadi pakai jendela gulir yang selalu
+    // memuat baris yang sedang disorot.
+    const uint8_t VIS = 3;
+    uint8_t first = (menuItem >= VIS) ? (menuItem - (VIS - 1)) : 0;
+    if (first + VIS > SETTINGS_COUNT)
+      first = (SETTINGS_COUNT > VIS) ? (SETTINGS_COUNT - VIS) : 0;
+
     // Baris pengaturan: label di kiri, nilai SEKARANG (bukan teks tetap)
     // di kanan — ambil langsung dari *val supaya selalu sesuai kondisi
     // real-time, walau diubah dari halaman ini sendiri lewat KIRI/KANAN.
-    for (uint8_t i = 0; i < menuLen[menuPage] && i < 4; i++)
+    for (uint8_t r = 0; r < VIS && (first + r) < SETTINGS_COUNT; r++)
     {
+      uint8_t i = first + r;
       char val[10];
       snprintf(val, sizeof(val), "%d%s", *settingsList[i].val, settingsList[i].unit);
-      menuRow(i, menuItem, settingsList[i].label, val);
+      menuRow(r, menuItem - first, settingsList[i].label, val);
     }
   }
   else

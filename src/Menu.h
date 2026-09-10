@@ -27,15 +27,17 @@ void startDefaultMode();
 struct SettingItem
 {
   const char *label;
+  const char *key;   // nama kunci di flash. Nanti ditambah nomor mode
+                      // (mis. "spdR2" -> "spdR20"/"spdR21"). Maks 13 huruf,
+                      // karena kunci NVS dibatasi 15 karakter.
   int        *val;   // pointer LANGSUNG ke variabel g_* asli — lihat
                       // catatan panjang soal ini di Menu.cpp
   int lo, hi, step;
   const char *unit;    // contoh: "%" ; kosongkan "" kalau tidak perlu satuan
-  bool persist;        // true = simpan ke flash, bertahan lintas restart.
-                        // false = cuma berlaku sesi ini (lihat Config.h).
+  bool persist;        // true = simpan ke flash, bertahan lintas restart
 };
 
-#define SETTINGS_COUNT 2
+#define SETTINGS_COUNT 6
 extern SettingItem settingsList[SETTINGS_COUNT];
 
 void settingsLoad();   // baca nilai tersimpan dari flash (NVS) — panggil di setup()

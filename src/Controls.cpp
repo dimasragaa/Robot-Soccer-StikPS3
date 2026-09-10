@@ -22,10 +22,43 @@
 // ============================================================
 
 // --- State sebelumnya untuk deteksi "1 tekan = 1 aksi" ---
-static bool pSelect=0, pStart=0, pUp=0, pDown=0, pLeft=0, pRight=0, pL1=0, pR1=0;
+// (KIRI/KANAN tidak ada di sini — keduanya pakai Repeater di bawah)
+static bool pSelect=0, pStart=0, pUp=0, pDown=0, pL1=0, pR1=0;
 static bool pCircle=0, pCross=0, pSquare=0;
 
 static bool edge(bool now, bool &prev){ bool e = now && !prev; prev = now; return e; }
+
+// --- Tombol dengan AUTO-REPEAT (dipakai KIRI/KANAN di layar PENGATURAN) ---
+//  Sekali ketuk -> 1 langkah (sama seperti edge biasa).
+//  Ditahan      -> setelah REPEAT_DELAY_MS mulai jalan sendiri, awalnya
+//                   pelan (REPEAT_RATE_MS) lalu dipercepat sendiri
+//                   (REPEAT_FAST_MS) kalau ditahan lebih dari
+//                   REPEAT_ACCEL_MS.
+//  Jeda awal penting supaya ketukan pendek tetap = 1 langkah persis.
+//  Percepatan penting karena langkahnya cuma 1: tanpa itu, menggeser
+//  Max Speed dari 60 ke 255 harus ditahan belasan detik.
+struct Repeater { bool held; unsigned long tDown, tLast; };
+
+static bool repeatFire(bool now, Repeater &r)
+{
+  if (!now) { r.held = false; return false; }        // dilepas -> reset
+
+  unsigned long t = millis();
+  if (!r.held) {                                      // baru ditekan
+    r.held = true; r.tDown = t; r.tLast = t;
+    return true;                                      // langkah pertama
+  }
+
+  unsigned long held = t - r.tDown;
+  if (held < REPEAT_DELAY_MS) return false;           // masih dalam jeda awal
+
+  unsigned long rate = (held > REPEAT_ACCEL_MS) ? REPEAT_FAST_MS : REPEAT_RATE_MS;
+  if (t - r.tLast < rate) return false;               // belum waktunya ulang
+  r.tLast = t;
+  return true;
+}
+
+static Repeater rLeft, rRight;
 
 // ------------------------------------------------------------
 //  STATUS KONEKSI STIK YANG BISA DIPERCAYA
@@ -52,11 +85,13 @@ bool ps3Linked()
 //  Fungsi ini dipakai untuk Serial Monitor & tampilan saja.
 // ------------------------------------------------------------
 int triggerSpeed(){
+  // g_spd* = variabel live yang bisa diatur dari menu PENGATURAN.
+  // SPD_DEFAULT (tanpa trigger) masih konstanta, tidak diatur dari menu.
   int kec = g_maxSpeed * SPD_DEFAULT / 100;
-  if      (Ps3.data.button.r2) kec = g_maxSpeed * SPD_R2 / 100;
-  else if (Ps3.data.button.r1) kec = g_maxSpeed * SPD_R1 / 100;
-  else if (Ps3.data.button.l2) kec = g_maxSpeed * CREEP_SPEED_PCT / 100;
-  else if (Ps3.data.button.l1) kec = g_maxSpeed * SPD_L1 / 100;
+  if      (Ps3.data.button.r2) kec = g_maxSpeed * g_spdR2 / 100;
+  else if (Ps3.data.button.r1) kec = g_maxSpeed * g_spdR1 / 100;
+  else if (Ps3.data.button.l2) kec = g_maxSpeed * g_spdL2 / 100;
+  else if (Ps3.data.button.l1) kec = g_maxSpeed * g_spdL1 / 100;
   return kec;
 }
 
@@ -102,7 +137,7 @@ static void driveManual()
   bool creepMode = Ps3.data.button.l2;
 
   // Saat creep: kecepatan ceiling rendah + ramp sangat halus
-  int kec      = creepMode ? (g_maxSpeed * CREEP_SPEED_PCT / 100) : triggerSpeed();
+  int kec      = creepMode ? (g_maxSpeed * g_spdL2 / 100) : triggerSpeed();
   int rampStep = creepMode ? CREEP_RAMP_STEP : g_rampStep;
 
   handleKick(kickArmed && Ps3.data.button.triangle);  // kick = SEGITIGA
@@ -155,6 +190,9 @@ static void handleMenu(bool eL1, bool eR1, bool eUp, bool eDown,
   // Ramp motor ke 0 hanya kalau belum berhenti (hemat CPU & GPIO setiap tick)
   if (curLeft != 0 || curRight != 0) stopMotorsSmooth();
 
+  // Ada perubahan setelan yang belum ditulis ke flash?
+  static bool dirty = false;
+
   if (menuPage == MENU_PAGE_PENGATURAN)
   {
     // --- Langkah 2: layar pengaturan mode yang baru dipilih ---
@@ -162,14 +200,27 @@ static void handleMenu(bool eL1, bool eR1, bool eUp, bool eDown,
     if (eDown) { menuItem = (menuItem + 1) % SETTINGS_COUNT;                  oledDirty = true; }
 
     // KIRI/KANAN ubah nilai baris yang sedang disorot. Berlaku detik itu
-    // juga (baca catatan panjangnya di Menu.cpp). Cuma item yang ditandai
-    // persist=true yang ditulis ke flash (lihat Menu.cpp/Config.h).
+    // juga (baca catatan panjangnya di Menu.cpp). Tombol ini auto-repeat,
+    // jadi ditahan = nilainya jalan terus.
     SettingItem &s = settingsList[menuItem];
-    if (eLeft)  { *s.val = max(s.lo, *s.val - s.step); if (s.persist) settingsSave(); oledDirty = true; }
-    if (eRight) { *s.val = min(s.hi, *s.val + s.step); if (s.persist) settingsSave(); oledDirty = true; }
+    if (eLeft)  { *s.val = max(s.lo, *s.val - s.step); dirty = true; oledDirty = true; }
+    if (eRight) { *s.val = min(s.hi, *s.val + s.step); dirty = true; oledDirty = true; }
 
-    if (eCircle) { menuPage = MENU_PAGE_MODE; menuItem = activeItem; oledDirty = true; }  // batal -> balik pilih mode
-    if (eStart)  { sysState = ST_RUN; oledDirty = true; }                                 // konfirmasi -> jalan
+    // Menulis ke flash SEKALI setelah tombol dilepas, bukan tiap langkah.
+    // Kalau ditulis tiap langkah, menahan tombol beberapa detik akan
+    // menghasilkan puluhan penulisan flash — boros umur flash dan tiap
+    // penulisan makan waktu, jadi nilainya terasa tersendat saat digeser.
+    if (dirty && !Ps3.data.button.left && !Ps3.data.button.right) {
+      settingsSave();
+      dirty = false;
+    }
+
+    // Batal / konfirmasi: pastikan perubahan yang belum sempat ditulis
+    // (mis. START ditekan sementara KIRI/KANAN masih ditahan) tetap tersimpan.
+    if (eCircle) { if (dirty) { settingsSave(); dirty = false; }
+                   menuPage = MENU_PAGE_MODE; menuItem = activeItem; oledDirty = true; }
+    if (eStart)  { if (dirty) { settingsSave(); dirty = false; }
+                   sysState = ST_RUN; oledDirty = true; }
   }
   else
   {
@@ -226,8 +277,9 @@ void controlsUpdate()
   bool eStart  = edge(Ps3.data.button.start,  pStart);
   bool eUp     = edge(Ps3.data.button.up,     pUp);
   bool eDown   = edge(Ps3.data.button.down,   pDown);
-  bool eLeft   = edge(Ps3.data.button.left,   pLeft);
-  bool eRight  = edge(Ps3.data.button.right,  pRight);
+  // KIRI/KANAN pakai auto-repeat: ditahan = nilainya jalan terus
+  bool eLeft   = repeatFire(Ps3.data.button.left,  rLeft);
+  bool eRight  = repeatFire(Ps3.data.button.right, rRight);
   bool eL1     = edge(Ps3.data.button.l1,     pL1);
   bool eR1     = edge(Ps3.data.button.r1,     pR1);
   bool eCircle = edge(Ps3.data.button.circle, pCircle);

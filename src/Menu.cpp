@@ -34,8 +34,12 @@ const char* menuItems[MENU_COUNT][4] = {
 //  jadi variabel biasa yang bebas diubah kapan pun ESP32 menyala.
 // ============================================================
 SettingItem settingsList[SETTINGS_COUNT] = {
-  { "Max Speed", &g_maxSpeed,  SPEED_SET_MIN, SPEED_SET_MAX, SPEED_SET_STEP, "",  true },
-  { "Steering",  &g_steerGain, STEER_SET_MIN, STEER_SET_MAX, STEER_SET_STEP, "%", true },
+  { "Max Speed", "maxSpeed",  &g_maxSpeed,  SPEED_SET_MIN, SPEED_SET_MAX, SPEED_SET_STEP, "",  true },
+  { "Steering",  "steerGain", &g_steerGain, STEER_SET_MIN, STEER_SET_MAX, STEER_SET_STEP, "%", true },
+  { "R2 Boost",  "spdR2",     &g_spdR2,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true },
+  { "R1 Cepat",  "spdR1",     &g_spdR1,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true },
+  { "L1 Pelan",  "spdL1",     &g_spdL1,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true },
+  { "L2 Creep",  "spdL2",     &g_spdL2,     TRIG_SET_MIN,  TRIG_SET_MAX,  TRIG_SET_STEP,  "%", true },
 };
 
 // ============================================================
@@ -54,58 +58,71 @@ SettingItem settingsList[SETTINGS_COUNT] = {
 // ============================================================
 static Preferences prefs;
 
-// Nilai bawaan tiap mode kalau BELUM PERNAH diatur manual (persis sama
-// seperti preset lama sebelum ada halaman PENGATURAN ini): Soccer 100%,
-// Sumo 110%. Max Speed bawaannya sama untuk semua mode (DEF_MAX_SPEED).
-static int defaultSteerFor(uint8_t mode) { return (mode == 1) ? 110 : 100; }
-
+// PENTING soal urutan panggil: settingsLoad() HARUS dipanggil SESUDAH
+// applyModePreset(). applyModePreset() memasang nilai pabrik mode ini,
+// lalu settingsLoad() menimpanya dengan nilai simpanan pengguna kalau ada.
+// Jadi mode yang belum pernah diatur manual tetap berperilaku seperti dulu.
 void settingsLoad()
 {
-  char keyMax[14], keySteer[14];
-  snprintf(keyMax,   sizeof(keyMax),   "maxSpeed%u",  activeItem);
-  snprintf(keySteer, sizeof(keySteer), "steerGain%u", activeItem);
-
   prefs.begin("robot", true);   // true = buka mode baca-saja
-  g_maxSpeed  = prefs.getInt(keyMax,   DEF_MAX_SPEED);
-  g_steerGain = prefs.getInt(keySteer, defaultSteerFor(activeItem));
-  prefs.end();
+  for (uint8_t i = 0; i < SETTINGS_COUNT; i++)
+  {
+    SettingItem &s = settingsList[i];
+    if (!s.persist) continue;
 
-  g_maxSpeed  = constrain(g_maxSpeed,  SPEED_SET_MIN, SPEED_SET_MAX);
-  g_steerGain = constrain(g_steerGain, STEER_SET_MIN, STEER_SET_MAX);
+    char k[16];
+    snprintf(k, sizeof(k), "%s%u", s.key, activeItem);
+    *s.val = prefs.getInt(k, *s.val);         // default = nilai pabrik mode ini
+    *s.val = constrain(*s.val, s.lo, s.hi);   // jaga-jaga kalau batas berubah
+  }
+  prefs.end();
 }
 
 void settingsSave()
 {
-  char keyMax[14], keySteer[14];
-  snprintf(keyMax,   sizeof(keyMax),   "maxSpeed%u",  activeItem);
-  snprintf(keySteer, sizeof(keySteer), "steerGain%u", activeItem);
-
   prefs.begin("robot", false);  // false = buka mode baca-tulis
-  prefs.putInt(keyMax,   g_maxSpeed);
-  prefs.putInt(keySteer, g_steerGain);
+  for (uint8_t i = 0; i < SETTINGS_COUNT; i++)
+  {
+    SettingItem &s = settingsList[i];
+    if (!s.persist) continue;
+
+    char k[16];
+    snprintf(k, sizeof(k), "%s%u", s.key, activeItem);
+    prefs.putInt(k, *s.val);
+  }
   prefs.end();
 }
 
 // ============================================================
-//  PRESET MODE
-//  Catatan: g_maxSpeed & g_steerGain SENGAJA TIDAK diatur di sini lagi.
-//  Keduanya sekarang murni milik pengguna lewat halaman PENGATURAN dan
-//  disimpan permanen (settingsSave) — kalau dipatok ulang di sini tiap
-//  pilih mode, setelan manual itu akan ketimpa balik. Cuma g_rampStep
-//  (kehalusan gerak, BUKAN parameter belok) yang tetap beda per mode.
+//  PRESET MODE — NILAI PABRIK
+//  Ini cuma titik awal. Segera setelah ini, settingsLoad() akan menimpa
+//  nilai-nilai yang pernah diatur manual untuk mode bersangkutan. Jadi:
+//    - mode yang belum pernah disentuh menu  -> pakai angka di bawah ini
+//    - mode yang sudah pernah diatur manual  -> pakai simpanan pengguna
+//  Keduanya tersimpan terpisah per mode, jadi atur di Sumo tidak
+//  mengubah Soccer sama sekali.
 // ============================================================
 void applyModePreset()
 {
-  kickArmed = false;
+  // --- Sama untuk semua mode ---
+  kickArmed  = false;
+  g_maxSpeed = DEF_MAX_SPEED;
+  g_spdR2    = SPD_R2;
+  g_spdR1    = SPD_R1;
+  g_spdL1    = SPD_L1;
+  g_spdL2    = CREEP_SPEED_PCT;
 
+  // --- Yang memang beda per mode ---
   switch (activeItem) {
     case 0:  // Soccer
-      g_rampStep = 6;
-      kickArmed = true;
+      g_rampStep  = 6;
+      g_steerGain = 100;
+      kickArmed   = true;
       break;
 
     case 1:  // Sumo
-      g_rampStep = 10;
+      g_rampStep  = 10;
+      g_steerGain = 110;
       break;
   }
 }

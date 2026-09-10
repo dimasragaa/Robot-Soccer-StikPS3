@@ -24,6 +24,15 @@ extern int  g_steerGain;
 extern int  g_rampStep;
 extern bool g_invert;
 
+// --- Kecepatan tiap trigger, persen dari g_maxSpeed (live juga) ---
+// Dulu ini konstanta SPD_* / CREEP_SPEED_PCT di Config.h yang butuh upload
+// ulang untuk diubah. Sekarang variabel biasa supaya bisa diatur dari menu.
+// Nilai awalnya tetap diambil dari Config.h lewat applyModePreset().
+extern int  g_spdR2;   // R2 ditahan  -> "KENCANG BANGET"
+extern int  g_spdR1;   // R1 ditahan  -> "KENCANG"
+extern int  g_spdL1;   // L1 ditahan  -> "PELAN"
+extern int  g_spdL2;   // L2 ditahan  -> "PELAN BANGET" (creep)
+
 // --- Status sistem & koneksi ---
 extern SysState sysState;
 extern bool hasActiveMode;
