@@ -257,20 +257,45 @@ static void drawMenu()
   snprintf(hdr, sizeof(hdr), "< %s >", menuTitle[menuPage]);
   header(hdr, "");
 
-  // Hanya dua pilihan mode: Soccer dan Sumo
-  for (uint8_t i = 0; i < menuLen[menuPage] && i < 4; i++)
-    menuRow(i, menuItem, menuItems[menuPage][i]);
+  if (menuPage == MENU_PAGE_PENGATURAN)
+  {
+    // Baris pengaturan: label di kiri, nilai SEKARANG (bukan teks tetap)
+    // di kanan — ambil langsung dari *val supaya selalu sesuai kondisi
+    // real-time, walau diubah dari halaman ini sendiri lewat KIRI/KANAN.
+    for (uint8_t i = 0; i < menuLen[menuPage] && i < 4; i++)
+    {
+      char val[10];
+      snprintf(val, sizeof(val), "%d%s", *settingsList[i].val, settingsList[i].unit);
+      menuRow(i, menuItem, settingsList[i].label, val);
+    }
+  }
+  else
+  {
+    // Halaman MODE MAIN: dua pilihan, Soccer dan Sumo
+    for (uint8_t i = 0; i < menuLen[menuPage] && i < 4; i++)
+      menuRow(i, menuItem, menuItems[menuPage][i]);
+  }
 
-  // Footer navigasi
-  // Catatan: layar 128px lebar = maks 21 karakter di textSize(1) (6px/karakter).
-  // Baris lama "UP/DOWN:mode  STA:pilih" = 23 karakter -> kepanjangan 2 karakter,
-  // jadi ke-wrap sendiri oleh Adafruit_GFX dan tabrakan sama baris "O:batal"
-  // di bawahnya -> itu sebabnya kelihatan berantakan. Diperpendek supaya pas.
+  // Footer navigasi — beda teks per halaman.
+  // Catatan lebar: layar 128px = maks 21 karakter di textSize(1) (6px/karakter).
+  // Kalau nambah baris footer baru, selalu hitung dulu panjangnya, karena
+  // versi awal footer ini sempat kepanjangan dan jadi ke-wrap sendiri oleh
+  // Adafruit_GFX sampai tabrakan sama baris di bawahnya.
   display.setTextSize(1);
-  display.setCursor(0, 50);
-  display.print("UP/DOWN:pilih mode");
-  display.setCursor(0, 57);
-  display.print("START:OK  O:batal");
+  if (menuPage == MENU_PAGE_PENGATURAN)
+  {
+    display.setCursor(0, 50);
+    display.print("UP/DN:pilih  L/R:ubah");   // 21 char
+    display.setCursor(0, 57);
+    display.print("L1/R1:mode  O:keluar");    // 20 char
+  }
+  else
+  {
+    display.setCursor(0, 50);
+    display.print("UP/DOWN:pilih mode");      // 18 char
+    display.setCursor(0, 57);
+    display.print("START:OK  O:batal");       // 17 char
+  }
 }
 
 // ============================================================

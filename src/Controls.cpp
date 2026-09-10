@@ -15,9 +15,11 @@
 //    X     : mundur -> maju          KOTAK : mundur -> putar KANAN
 //    BULAT : mundur -> putar KIRI    SELECT: buka/tutup menu
 //  Navigasi menu:
-//    UP/DOWN : pilih mode
-//    LEFT/RIGHT : tidak digunakan
-//    START : konfirmasi       BULAT : batal
+//    L1/R1      : pindah halaman (MODE MAIN <-> PENGATURAN)
+//    UP/DOWN    : pilih baris di halaman aktif
+//    LEFT/RIGHT : di halaman PENGATURAN -> ubah nilai baris terpilih
+//    START      : (halaman MODE MAIN) konfirmasi pilih mode
+//    BULAT      : batal / keluar menu
 // ============================================================
 
 // --- State sebelumnya untuk deteksi "1 tekan = 1 aksi" ---
@@ -147,13 +149,25 @@ static void handleMenu(bool eL1, bool eR1, bool eUp, bool eDown,
   // Ramp motor ke 0 hanya kalau belum berhenti (hemat CPU & GPIO setiap tick)
   if (curLeft != 0 || curRight != 0) stopMotorsSmooth();
 
-  // Hanya ada satu halaman MODE MAIN, jadi L1/R1 tidak melakukan apa-apa.
+  // L1/R1: pindah antar halaman menu (MODE MAIN <-> PENGATURAN)
+  if (eL1) { menuPage = (menuPage + MENU_COUNT - 1) % MENU_COUNT; menuItem = 0; oledDirty = true; }
+  if (eR1) { menuPage = (menuPage + 1) % MENU_COUNT;              menuItem = 0; oledDirty = true; }
+
   if (eUp)   { menuItem = (menuItem + menuLen[menuPage] - 1) % menuLen[menuPage]; oledDirty = true; }
   if (eDown) { menuItem = (menuItem + 1) % menuLen[menuPage];                     oledDirty = true; }
 
   if (eCircle) { sysState = hasActiveMode ? ST_RUN : ST_IDLE; oledDirty = true; } // batal
 
-  if (eStart)  // konfirmasi
+  if (menuPage == MENU_PAGE_PENGATURAN)
+  {
+    // KIRI/KANAN ubah nilai baris yang sedang disorot. Berlaku detik itu
+    // juga (baca catatan panjangnya di Menu.cpp) dan langsung disimpan ke
+    // flash supaya tidak hilang walau ESP32 restart.
+    SettingItem &s = settingsList[menuItem];
+    if (eLeft)  { *s.val = max(s.lo, *s.val - s.step); settingsSave(); oledDirty = true; }
+    if (eRight) { *s.val = min(s.hi, *s.val + s.step); settingsSave(); oledDirty = true; }
+  }
+  else if (eStart)  // halaman MODE MAIN: konfirmasi pilih mode
   {
     // Pilih MODE -> masuk RUN
     activeMenu = menuPage;

@@ -95,7 +95,9 @@ void setup()
   motorSetup();
   displaySetup();
 
-  applyModePreset();   // siapkan parameter mode default sebelum stik konek
+  settingsLoad();       // ambil Max Speed hasil aturan manual (kalau ada) dari flash
+  applyModePreset();    // siapkan parameter mode default sebelum stik konek
+                         // (tidak menimpa Max Speed — lihat catatan di Menu.cpp)
 
   Ps3.attach(onPs3Data);          // pencatat waktu paket (deteksi putus)
   Ps3.attachOnConnect(onConnect);

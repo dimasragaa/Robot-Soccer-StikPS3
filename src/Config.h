@@ -79,6 +79,22 @@
 #define DEF_INVERT      false // balik arah belok
 
 // ------------------------------------------------------------
+//  PENGATURAN LIVE (SELECT > PENGATURAN)
+//  Diubah lewat stik SAAT ESP32 JALAN -> langsung dipakai motor detik itu
+//  juga, tanpa upload ulang. Ini beda dari angka lain di file ini: semua
+//  #define di Config.h itu KONSTANTA yang dipatok saat compile (upload
+//  ulang wajib kalau diubah), sedangkan Max Speed di sini disimpan di
+//  variabel g_maxSpeed (RAM) yang memang dibaca ulang tiap tick oleh
+//  driveManual() — itu sebabnya bisa "hidup" tanpa compile ulang.
+//  Detail lengkapnya ada di komentar Menu.cpp.
+//  Nilai yang diatur disimpan ke flash (NVS) juga, supaya tidak hilang
+//  walau ESP32 restart/mati (termasuk restart otomatis saat stik putus).
+// ------------------------------------------------------------
+#define SPEED_SET_MIN   60    // batas bawah Max Speed yang boleh diatur
+#define SPEED_SET_MAX   255   // batas atas
+#define SPEED_SET_STEP  5     // besar loncatan tiap tekan KIRI/KANAN
+
+// ------------------------------------------------------------
 //  TIMING (milidetik)
 // ------------------------------------------------------------
 #define DEADBAND     12   // ambang stik dianggap netral
