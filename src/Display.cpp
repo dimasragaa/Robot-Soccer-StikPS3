@@ -294,10 +294,23 @@ static void drawIdle()
 // ============================================================
 static void drawOLED()
 {
+  bool disconnected = !Ps3.isConnected();
+
+  // Layar putih + tulisan hitam saat PS3 terputus (kebalikan dari biasanya).
+  // Cukup 1 perintah hardware, bukan gambar ulang tiap elemen dengan warna
+  // kebalik satu-satu -> ringan, dan cuma dikirim saat statusnya BERUBAH
+  // (bukan tiap frame) supaya tidak nambah trafik I2C percuma.
+  static bool lastInverted = false;
+  if (disconnected != lastInverted)
+  {
+    lastInverted = disconnected;
+    display.invertDisplay(disconnected);
+  }
+
   display.clearDisplay();
   display.setTextColor(C_WHITE);
 
-  if (!Ps3.isConnected())
+  if (disconnected)
     drawDisconnected();
   else if (sysState == ST_MENU)
     drawMenu();
