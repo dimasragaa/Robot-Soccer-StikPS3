@@ -46,5 +46,7 @@ extern SeqPhase seqState;
 extern unsigned long seqStart;
 
 // --- Flag & timer tampilan ---
-extern bool oledDirty;
+// volatile: dinyalakan dari task lain (loop/callback PS3), dibaca & dimatikan
+// oleh task OLED. Tanpa ini compiler boleh menyimpannya di register.
+extern volatile bool oledDirty;
 extern unsigned long lastControl, lastOled, lastPrint;

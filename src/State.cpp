@@ -25,5 +25,5 @@ SeqType  seqType  = SQ_NONE;
 SeqPhase seqState = SEQ_IDLE;
 unsigned long seqStart = 0;
 
-bool oledDirty = true;
+volatile bool oledDirty = true;
 unsigned long lastControl = 0, lastOled = 0, lastPrint = 0;

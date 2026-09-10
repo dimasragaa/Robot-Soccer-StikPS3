@@ -9,5 +9,7 @@
 //  By: github.com/dimasragaa — IG: @dmsragaa
 // ============================================================
 
-void displaySetup();               // init OLED, panggil di setup()
-void displayTick(unsigned long now); // render bila perlu (throttle internal)
+// Init OLED + jalankan task penggambar. Panggil sekali di setup().
+// Setelah ini OLED mengurus dirinya sendiri di task terpisah —
+// loop() tidak perlu (dan tidak boleh) ikut menggambar lagi.
+void displaySetup();

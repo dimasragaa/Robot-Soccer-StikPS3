@@ -33,6 +33,9 @@ void onDisconnect() { digitalWrite(LED_PIN, LOW);  Serial.println(">> PS3 DISCON
 // ============================================================
 void setup()
 {
+  // Buffer kirim diperbesar supaya baris debug yang panjang tidak menahan
+  // loop() saat menunggu UART. Harus dipanggil SEBELUM begin().
+  Serial.setTxBufferSize(256);
   Serial.begin(115200);
 
   // Opsional: matikan brownout detector kalau reset terus saat motor nyentak.
@@ -68,7 +71,8 @@ void loop()
     controlsUpdate();   // semua logika tombol/stik/sequence
   }
 
-  displayTick(now);     // update OLED (throttle di dalam)
+  // OLED tidak digambar di sini: sudah punya task sendiri (Display.cpp),
+  // supaya kiriman data ke layar tidak menahan kontrol stik/motor.
   debugTick(now);       // cetak serial (throttle di dalam)
 
   // vTaskDelay yield bersih ke FreeRTOS scheduler (lebih baik dari delay(1))

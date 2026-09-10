@@ -309,6 +309,42 @@ static void drawOLED()
   display.display();
 }
 
+// ============================================================
+//  TASK OLED — berdiri sendiri, TIDAK numpang di loop()
+//
+//  Alasan: sekali gambar, isi layar (1 KB) dikirim lewat I2C dan itu
+//  makan belasan milidetik. Kalau dikerjakan di dalam loop(), kontrol
+//  stik + ramp motor ikut tertahan selama itu -> gerakan terasa nyendat
+//  tiap layar refresh (paling kerasa saat sequence otomatis jalan).
+//
+//  Task ini dipasang di CORE 1 (bareng loop()) dengan prioritas sama,
+//  jadi keduanya gantian tiap tick — loop() tetap dapat giliran ~1 ms
+//  walau OLED sedang mengirim data.
+//  CORE 0 sengaja tidak dipakai: itu jatah stack Bluetooth PS3, biar
+//  koneksi stik tidak terganggu sama sekali.
+//
+//  Sebagian besar waktu task ini tidur (vTaskDelay), jadi bebannya
+//  ke CPU nyaris nol saat tidak menggambar.
+// ============================================================
+static void oledTask(void *)
+{
+  for (;;)
+  {
+    // Refresh lebih cepat saat sequence aktif (animasi progress bar)
+    uint32_t period = (sysState == ST_RUN && seqState != SEQ_IDLE)
+                          ? 60
+                          : OLED_MS;
+    unsigned long now = millis();
+    if (oledDirty || (now - lastOled >= period))
+    {
+      lastOled  = now;
+      oledDirty = false;
+      drawOLED();
+    }
+    vTaskDelay(10 / portTICK_PERIOD_MS); // cek tiap 10 ms, sisanya tidur
+  }
+}
+
 void displaySetup()
 {
   Wire.begin(OLED_SDA, OLED_SCL);
@@ -322,26 +358,13 @@ void displaySetup()
   {
     display.clearDisplay();
     display.display();
+    // OLED digambar di task sendiri (lihat catatan di oledTask)
+    xTaskCreatePinnedToCore(oledTask, "oled", 4096, nullptr, 1, nullptr, 1);
   }
   else
     Serial.println("OLED tidak terdeteksi, lanjut tanpa OLED");
 }
 
-void displayTick(unsigned long now)
-{
-  // Refresh lebih cepat saat sequence aktif (animasi progress bar)
-  uint32_t period = (sysState == ST_RUN && seqState != SEQ_IDLE)
-                        ? 60
-                        : OLED_MS;
-  if (oledOK && (oledDirty || (now - lastOled >= period)))
-  {
-    lastOled = now;
-    oledDirty = false;
-    drawOLED();
-  }
-}
-
 #else
 void displaySetup() {}
-void displayTick(unsigned long) {}
 #endif
