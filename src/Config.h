@@ -119,12 +119,12 @@
 //    BULAT : mundur -> putar KIRI
 // ------------------------------------------------------------
 // Durasi fase (ms)
-#define SEQX_MUNDUR_MS  1000  // X: lama mundur
-#define SEQX_MAJU_MS    1000  // X: lama maju
-#define SEQ_MUNDUR_MS   300   // kotak/bulat: lama mundur
+#define SEQX_MUNDUR_MS  200  // X: lama mundur
+#define SEQX_MAJU_MS    550  // X: lama maju
+#define SEQ_MUNDUR_MS   400   // kotak/bulat: lama mundur
 #define SEQ_PUTAR_MS    500   // kotak/bulat: lama putar
 
 // Kecepatan saat sequence (0..255)
 #define SEQ_SPEED_MUNDUR 180
-#define SEQ_SPEED_MAJU   180
+#define SEQ_SPEED_MAJU   255
 #define SEQ_SPEED_PUTAR  150
